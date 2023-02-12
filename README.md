@@ -45,7 +45,7 @@ let rec foldRight f lst z =
   | Cons x xs -> f x (foldRight f xs z) ;
 
 let length lst =
-  foldRight (\a b -> a + 1) lst 0 ;
+  foldRight (\a b -> b + 1) lst 0 ;
 
 let sum lst = 
   foldRight (\a b -> a + b) lst 0 ;
@@ -84,7 +84,7 @@ map = function: (a -> b) -> List a -> List b
 find = function: (a -> Bool) -> List a -> Result String a
 upper = 10: Int
 items = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 (Cons 6 (Cons 7 (Cons 8 (Cons 9 (Cons 10 Nil))))))))): List Int
-2: Int
+10: Int
 Cons 0 (Cons 1 (Cons 3 (Cons 6 (Cons 10 (Cons 15 (Cons 21 (Cons 28 (Cons 36 (Cons 45 Nil))))))))): List Int
 Okay 2: Result String Int
 Error "Not found": Result String Int
