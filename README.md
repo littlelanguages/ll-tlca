@@ -1,20 +1,12 @@
 # ll-tlca
 
-This *little language*, Typed Lambda Calculus with ADTs (TLCA), is a function language with union types or abstract data types (ADT).
-
-A feature list of this language is:
-
-- Expressions produce no side-effects,
-- Expressions are all typed using [Hindley-Milner](https://en.wikipedia.org/wiki/Hindley–Milner_type_system) type inference,
-- Supports Unit, Bool, Int, String, higher-order functions, tuples and abstract data types,
-- Associate values to names using `let` and recursive values using `let rec` declarations, and
-- Pattern matching to destruct ADT values
+Typed Lambda Calculus with ADTs (TLCA) is a small but powerful functional programming language incorporating abstract data types (ADTs). TLCA exhibits no side-effects in expressions and uses the [Hindley-Milner](https://en.wikipedia.org/wiki/Hindley–Milner_type_system) type inference system for strong typing. It supports Unit, Bool, Int, String, higher-order functions, tuples, and ADTs, enables naming values with `let` and recursive values with `let rec`, and includes pattern matching for ADT value deconstruction.
 
 ## TLCA Program Examples
 
 The following code declares the mutually recursive functions `isOdd` and `isEven` then invokes each with a single value.
 
-```ocaml
+```sml
 let rec isOdd n = if (n == 0) False else isEven (n - 1)
     and isEven n = if (n == 0) True else isOdd (n - 1) ;
 
@@ -24,7 +16,7 @@ isEven 5
 
 The above program is type safe and, when executed, produces
 
-```ocaml
+```sml
 isOdd = function: Int -> Bool
 isEven = function: Int -> Bool
 true: Bool
@@ -33,7 +25,11 @@ false: Bool
 
 The following examples shows off how to declare a list, some of the traditional functions over a list and then, using these functions, create, filter and transforms lists.
 
-```ocaml
+```sml
+data Result c b = 
+    Error c 
+  | Okay b ;
+
 data List a = 
     Cons a (List a) 
   | Nil ;
@@ -57,57 +53,39 @@ let sum lst =
 let map f lst =
   foldRight (\a -> Cons (f a)) lst Nil ;
 
+let rec find p lst =
+  match lst with
+  | Nil -> Error "Not found"
+  | Cons x xs -> if (p x) Okay x else find p xs ;
+
 let upper = 10 ;
 
 let items = range upper + 1 ;
 
 length items ;
 
-map sum (map range items)
-```
-
-Rather satisfyingly the above program produces
-
-```ocaml
-List a = Cons a (List a) | Nil
-range = function: Int -> List Int
-foldRight = function: (a -> b -> b) -> List a -> b -> b
-length = function: List Int -> Int
-sum = function: List Int -> Int
-map = function: (a -> b) -> List a -> List b
-upper = 10: Int
-items = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 (Cons 6 (Cons 7 (Cons 8 (Cons 9 (Cons 10 Nil))))))))): List Int
-2: Int
-Cons 0 (Cons 1 (Cons 3 (Cons 6 (Cons 10 (Cons 15 (Cons 21 (Cons 28 (Cons 36 (Cons 45 Nil))))))))): List Int
-```
-
-The following program uses List and Result to implement a find function over lists.
-
-```ocaml
-data Result c b = 
-    Error c 
-  | Okay b ;
-
-data List a = 
-    Cons a (List a) 
-  | Nil ;
-
-let rec find p lst =
-  match lst with
-  | Nil -> Error "Not found"
-  | Cons x xs -> if (p x) Okay x else find p xs ;
+map sum (map range items) ;
 
 find (\x -> x == 2) (Cons 1 (Cons 2 (Cons 3 Nil))) ;
 
 find (\x -> x == 10) (Cons 1 (Cons 2 (Cons 3 Nil)))
 ```
 
-The result of this program is as expected.
+Rather satisfyingly the following is produced
 
-```ocaml
+```sml
 Result c b = Error c | Okay b
 List a = Cons a (List a) | Nil
+range = function: Int -> List Int
+foldRight = function: (a -> b -> b) -> List a -> b -> b
+length = function: List Int -> Int
+sum = function: List Int -> Int
+map = function: (a -> b) -> List a -> List b
 find = function: (a -> Bool) -> List a -> Result String a
+upper = 10: Int
+items = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 (Cons 6 (Cons 7 (Cons 8 (Cons 9 (Cons 10 Nil))))))))): List Int
+2: Int
+Cons 0 (Cons 1 (Cons 3 (Cons 6 (Cons 10 (Cons 15 (Cons 21 (Cons 28 (Cons 36 (Cons 45 Nil))))))))): List Int
 Okay 2: Result String Int
 Error "Not found": Result String Int
 ```
