@@ -4,25 +4,6 @@ Typed Lambda Calculus with ADTs (TLCA) is a small but powerful functional progra
 
 ## TLCA Program Examples
 
-The following code declares the mutually recursive functions `isOdd` and `isEven` then invokes each with a single value.
-
-```sml
-let rec isOdd n = if (n == 0) False else isEven (n - 1)
-    and isEven n = if (n == 0) True else isOdd (n - 1) ;
-
-isOdd 5 ;
-isEven 5
-```
-
-The above program is type safe and, when executed, produces
-
-```sml
-isOdd = function: Int -> Bool
-isEven = function: Int -> Bool
-true: Bool
-false: Bool
-```
-
 The following examples shows off how to declare a list, some of the traditional functions over a list and then, using these functions, create, filter and transforms lists.
 
 ```sml
@@ -88,6 +69,25 @@ items = Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 5 (Cons 6 (Cons 7 (Cons 8 (Cons 9 (
 Cons 0 (Cons 1 (Cons 3 (Cons 6 (Cons 10 (Cons 15 (Cons 21 (Cons 28 (Cons 36 (Cons 45 Nil))))))))): List Int
 Okay 2: Result String Int
 Error "Not found": Result String Int
+```
+
+The preceding code illustrates TLCA's features expect for mutual recursion.  This omission is addressed in the following code which declares mutually recursive functions `isOdd` and `isEven` then invokes each with a single value.
+
+```sml
+let rec isOdd n = if (n == 0) False else isEven (n - 1)
+    and isEven n = if (n == 0) True else isOdd (n - 1) ;
+
+isOdd 5 ;
+isEven 5
+```
+
+The above program is type safe and, when executed, produces
+
+```sml
+isOdd = function: Int -> Bool
+isEven = function: Int -> Bool
+true: Bool
+false: Bool
 ```
 
 ## Grammar
