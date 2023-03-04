@@ -20,19 +20,19 @@ let range n =
      if (n == m) Nil else Cons m (helper m + 1)
    in helper 1 ;
 
-let rec foldRight f lst z =
+let rec foldRight f z lst =
   match lst with
   | Nil -> z
-  | Cons x xs -> f x (foldRight f xs z) ;
+  | Cons x xs -> f x (foldRight f z xs) ;
 
-let length lst =
-  foldRight (\a b -> b + 1) lst 0 ;
+let length =
+  foldRight (\a b -> b + 1) 0 ;
 
-let sum lst = 
-  foldRight (\a b -> a + b) lst 0 ;
+let sum = 
+  foldRight (\a b -> a + b) 0 ;
 
-let map f lst =
-  foldRight (\a -> Cons (f a)) lst Nil ;
+let map f =
+  foldRight (\a -> Cons (f a)) Nil ;
 
 let rec find p lst =
   match lst with
@@ -58,8 +58,8 @@ Rather satisfyingly the following is produced
 Result c b = Error c | Okay b
 List a = Cons a (List a) | Nil
 range = function: Int -> List Int
-foldRight = function: (a -> b -> b) -> List a -> b -> b
-length = function: List Int -> Int
+foldRight = function: (a -> b -> b) -> b -> List a -> b
+length = function: List a -> Int
 sum = function: List Int -> Int
 map = function: (a -> b) -> List a -> List b
 find = function: (a -> Bool) -> List a -> Result String a
