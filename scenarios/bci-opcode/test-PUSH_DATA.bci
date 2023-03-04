@@ -1,0 +1,11 @@
+PUSH_INT 10
+PUSH_DATA $$List 0 0
+PUSH_DATA $$List 1 2
+RET
+
+.data
+:$$List
+0x2 0x0 0x0 0x0
+List
+Nil
+Cons

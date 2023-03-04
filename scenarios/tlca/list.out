@@ -1,0 +1,10 @@
+List a = Cons a (List a) | Nil
+range = function: Int -> List Int
+foldLeft = function: (a -> b -> a) -> a -> List b -> a
+foldRight = function: (a -> b -> b) -> List a -> b -> b
+length = function: List a -> Int
+sum = function: List Int -> Int
+map = function: (a -> b) -> List a -> List b
+upper = 10: Int
+10: Int
+Cons 0 (Cons 1 (Cons 3 (Cons 6 (Cons 10 (Cons 15 (Cons 21 (Cons 28 (Cons 36 (Cons 45 Nil))))))))): List Int

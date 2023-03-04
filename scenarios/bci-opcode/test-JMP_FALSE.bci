@@ -1,0 +1,8 @@
+PUSH_TRUE
+JMP_FALSE $$jmp_target
+PUSH_FALSE
+RET
+
+:$$jmp_target
+PUSH_TRUE
+RET

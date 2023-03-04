@@ -1,0 +1,122 @@
+#!/bin/bash
+
+PROJECT_HOME=$(dirname "$0")/..
+
+build_jar() {
+    echo "---| build JAR"
+
+    ./gradlew jar || exit 1
+}
+
+build_parser() {
+    echo "---| build parser"
+
+    mkdir -p ./parser || exit 1
+
+    deno run --allow-read --allow-write --allow-net --unsafely-ignore-certificate-errors \
+        "https://raw.githubusercontent.com/littlelanguages/parspiler-cli/main/mod.ts" kotlin \
+        --verbose \
+        --directory=./app/src/main/kotlin \
+        --package=tlca.parser \
+        ../tlca/Grammar.llgd || exit 1
+}
+
+interpreter_scenario_tests() {
+    echo "---| interpreter scenario tests"
+
+    BASE_DIR=../../scenarios/tlca
+    for FILE in "$BASE_DIR"/*.inp; do
+        echo "- scenario test: $FILE"
+        java -jar ./app/build/libs/app.jar "$FILE" > t.txt || exit 1
+
+        if ! diff -q "$BASE_DIR"/$(basename "$FILE" .inp).out t.txt; then
+            echo "scenario test failed: $FILE"
+            diff "$BASE_DIR"/$(basename "$FILE" .inp).out t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
+    done
+}
+
+compiler_scenario_tests() {
+    echo "---| compiler scenario tests"
+
+    BASE_DIR=../../scenarios/tlca
+    for FILE in "$BASE_DIR"/*.inp; do
+        echo "- scenario test: $FILE"
+        java -jar ./app/build/libs/app.jar "$FILE" "$BASE_DIR"/$(basename "$FILE" .inp).bin || exit 1
+        ../bci-deno/bci run "$BASE_DIR"/$(basename "$FILE" .inp).bin > t.txt || exit 1
+
+        if ! diff -q "$BASE_DIR"/$(basename "$FILE" .inp).out t.txt; then
+            echo "scenario test failed: $FILE"
+            diff "$BASE_DIR"/$(basename "$FILE" .inp).out t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
+    done
+}
+
+unit_tests() {
+    echo "---| unit tests"
+    ./gradlew test || exit 1
+}
+
+cd "$PROJECT_HOME" || exit 1
+
+case "$1" in
+"" | help)
+    echo "Usage: $0 [<command>]"
+    echo "Commands:"
+    echo "  help"
+    echo "    This help page"
+    echo "  compiler_scenario"
+    echo "    Run all compiler scenario tests"
+    echo "  interpreter_scenario"
+    echo "    Run all interpreter scenario tests"
+    echo "  jar"
+    echo "    Create the application's JAR file"
+    echo "  parser"
+    echo "    Builds the parser from specs"
+    echo "  run"
+    echo "    Run all tasks"
+    echo "  unit"
+    echo "    Run all unit tests"
+    ;;
+
+compiler_scenario)
+    compiler_scenario_tests
+    ;;
+
+interpreter_scenario)
+    interpreter_scenario_tests
+    ;;
+
+run)
+    build_parser
+    unit_tests
+    build_jar
+    interpreter_scenario_tests
+    compiler_scenario_tests
+    ;;
+
+jar)
+    build_jar
+    ;;
+
+parser)
+    build_parser
+    ;;
+
+unit)
+    unit_tests
+    ;;
+
+*)
+    echo "$0: $1: Unknown command"
+    exit 1
+    ;;
+esac

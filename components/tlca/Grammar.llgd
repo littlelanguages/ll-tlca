@@ -1,0 +1,94 @@
+uses "./Scanner.llld";
+
+Program
+    : Element {";" Element}
+    ;
+
+Element
+    : Expression
+    | DataDeclaration
+    ;
+
+Expression
+    : Relational {Relational}
+    ;
+
+Relational
+    : Additive ["==" Additive]
+    ;
+
+Additive
+    : Multiplicative {AdditiveOps Multiplicative}
+    ;
+
+AdditiveOps
+    : "+"
+    | "-"
+    ;
+
+Multiplicative
+    : Factor {MultiplicativeOps Factor}
+    ;
+
+MultiplicativeOps
+    : "*"
+    | "/"
+    ;
+
+Factor
+    : "(" [Expression {"," Expression}] ")"
+    | LiteralInt
+    | LiteralString
+    | "True"
+    | "False"
+    | "\" LowerIdentifier {LowerIdentifier} "->" Expression
+    | "let" ["rec"] ValueDeclaration {"and" ValueDeclaration} ["in" Expression]
+    | "if" "(" Expression ")" Expression "else" Expression
+    | LowerIdentifier
+    | UpperIdentifier
+    | "match" Expression "with" ["|"] Case {"|" Case}
+    ;
+
+ValueDeclaration
+    : LowerIdentifier {LowerIdentifier} "=" Expression
+    ;
+
+Case
+    : Pattern "->" Expression
+    ;
+
+Pattern
+    : "(" [Pattern {"," Pattern}] ")"
+    | LiteralInt
+    | LiteralString
+    | "True"
+    | "False"
+    | LowerIdentifier
+    | UpperIdentifier {Pattern}
+    ;
+
+DataDeclaration
+    : "data" TypeDeclaration {"and" TypeDeclaration}
+    ;
+
+TypeDeclaration
+    : UpperIdentifier {LowerIdentifier} "=" ConstructorDeclaration {"|" ConstructorDeclaration}
+    ;
+
+ConstructorDeclaration
+    : UpperIdentifier {Type}
+    ;
+
+Type
+    : ADTType {"->" ADTType}
+    ;
+
+ADTType
+    : UpperIdentifier {Type}
+    | TermType
+    ;
+
+TermType
+    : LowerIdentifier
+    | "(" [Type {"*" Type}] ")"
+    ;

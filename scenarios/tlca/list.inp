@@ -1,0 +1,33 @@
+data List a = Cons a (List a) | Nil ;
+
+let range n = 
+  let rec helper m =
+     if (n == m) Nil else Cons m (helper m + 1)
+   in helper 1 ;
+
+let rec foldLeft f z lst =
+  match lst with
+  | Nil -> z
+  | Cons x xs -> foldLeft f (f z x) xs;
+
+let rec foldRight f lst z =
+  match lst with
+  | Nil -> z
+  | Cons x xs -> f x (foldRight f xs z) ;
+
+let length lst =
+  foldLeft (\a b -> a + 1) 0 lst ;
+
+let sum lst = 
+  foldRight (\a b -> a + b) lst 0 ;
+
+let rec map f lst =
+  match lst with
+  | Nil -> Nil 
+  | Cons x xs -> Cons (f x) (map f xs) ;
+
+let upper = 10 ;
+
+length (range upper + 1) ;
+
+map sum (map range (range upper + 1))

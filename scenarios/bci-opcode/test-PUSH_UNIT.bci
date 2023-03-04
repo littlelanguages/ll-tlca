@@ -1,0 +1,8 @@
+PUSH_BUILTIN $$builtin-print
+PUSH_UNIT
+SWAP_CALL
+PUSH_BUILTIN $$builtin-println
+PUSH_UNIT
+SWAP_CALL
+PUSH_UNIT
+RET

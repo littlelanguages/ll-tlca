@@ -1,0 +1,47 @@
+# let
+#   sum n =
+#     let rec total i = 
+#       if (i == n) i else i + (total (i + 1))
+#     in total 0
+# in
+#   sum 10
+
+ENTER 1
+  PUSH_CLOSURE $$sum
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 10
+  SWAP_CALL
+  RET
+
+:$$sum
+  ENTER 2
+  STORE_VAR 0
+  PUSH_CLOSURE $$total
+  STORE_VAR 1
+  PUSH_VAR 0 1
+  PUSH_INT 0
+  SWAP_CALL
+  RET
+
+:$$total
+  ENTER 1
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_VAR 1 0
+  EQ
+  JMP_TRUE $$if-then
+  PUSH_VAR 0 0
+  PUSH_VAR 1 1
+  PUSH_VAR 0 0
+  PUSH_INT 1
+  ADD
+  SWAP_CALL
+  ADD
+  JMP $$if-continue
+
+:$$if-then
+  PUSH_VAR 0 0
+
+:$$if-continue
+  RET

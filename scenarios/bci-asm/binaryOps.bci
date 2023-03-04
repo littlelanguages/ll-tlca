@@ -1,0 +1,13 @@
+# 10 + 20 - 30 * 40 / 5
+
+:$$main
+  PUSH_INT 10
+  PUSH_INT 20
+  ADD
+  PUSH_INT 30
+  PUSH_INT 40
+  MUL
+  PUSH_INT 5
+  DIV
+  SUB
+  RET

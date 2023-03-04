@@ -1,0 +1,11 @@
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+.idea
+
+app/bin/
+app/t.bin
+app/src/main/kotlin/io/
+app/src/main/kotlin/tlca/parser/

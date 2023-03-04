@@ -1,0 +1,85 @@
+#!/bin/bash
+
+PROJECT_HOME=$(dirname "$0")/..
+cd "$PROJECT_HOME" || exit 1
+
+build_bci_c() {
+    ./components/bci-c/tasks/dev run || exit 1
+}
+
+build_bci_deno() {
+    ./components/bci-deno/tasks/dev run || exit 1
+}
+
+build_deno() {
+    ./components/deno/tasks/dev run || exit 1
+}
+
+build_kotlin() {
+    ./components/kotlin/tasks/dev run || exit 1
+}
+
+clean() {
+    ./components/bci-c/tasks/clean || exit 1
+    ./components/bci-deno/tasks/clean || exit 1
+    ./components/deno/tasks/clean || exit 1
+    ./components/kotlin/tasks/clean || exit 1
+
+    rm -i ./scenarios/bci-asm/*.bin || exit 1
+    rm -i ./scenarios/bci-opcode/*.bin || exit 1
+    rm -i ./scenarios/tlca/*.bin || exit 1
+}
+
+case "$1" in
+"" | help)
+    echo "Usage: $0 [<command>]"
+    echo "Commands:"
+    echo "  help"
+    echo "    This help page"
+    echo "  build-bci-c"
+    echo "    Builds C implementation of TLCA BCI (bytecode interpreter)"
+    echo "  build-bci-deno"
+    echo "    Builds Deno implementation of TLCA BCI (bytecode interpreter)"
+    echo "  build-deno"
+    echo "    Builds Deno implementation of TLCA REPL"
+    echo "  build-kotlin"
+    echo "    Builds Kotlin implementation of TLCA REPL and compiler"
+    echo "  clean"
+    echo "    Removes all generated files"
+    echo "  run"
+    echo "    Builds the entire suite"
+    ;;
+
+build-bci-c)
+    build_bci_c
+    ;;
+
+build-bci-deno)
+    build_bci_deno
+    ;;
+
+build-deno)
+    build_deno
+    ;;
+
+build-kotlin)
+    build_kotlin
+    ;;
+
+clean)
+    clean
+    ;;
+
+run)
+    build_deno
+    build_kotlin
+
+    build_bci_c
+    build_bci_deno
+    ;;
+
+*)
+    echo "$0: $1: Unknown command"
+    exit 1
+    ;;
+esac

@@ -1,0 +1,11 @@
+data Result c b = Error c | Okay b ;
+data Option a = None | Some a ;
+
+data List a = Cons a (List a) | Nil ;
+
+let rec find p lst =
+  match lst with
+  | Nil -> Error "Not found"
+  | Cons x xs -> if (p x) Okay x else find p xs ;
+
+find (\x -> x == 2) (Cons 1 (Cons 2 (Cons 3 Nil)))

@@ -1,0 +1,27 @@
+#!/bin/bash
+
+PROJECT_HOME=$(dirname "$0")/..
+cd "$PROJECT_HOME" || exit 1
+
+clean() {
+    rm -rf ./parser
+}
+
+case "$1" in
+help)
+    echo "Usage: $0 [<command>]"
+    echo "Commands:"
+    echo "  help"
+    echo "    This help page"
+    echo "  clean"
+    echo "    Removes all generated files"
+    ;;
+
+"" | clean)
+    clean
+    ;;
+*)
+    echo "$0: $1: Unknown command"
+    exit 1
+    ;;
+esac

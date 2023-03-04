@@ -1,0 +1,19 @@
+tokens
+    UpperIdentifier = upperID {digit | id};
+    LowerIdentifier = lowerID {digit | id};
+    LiteralInt = ['-'] digits;
+    LiteralString = '"' {!('"' + cr) | "\" '"'}  '"';
+
+comments
+   "--" {!cr};
+
+whitespace
+  chr(0)-' ';
+
+fragments
+  digit = '0'-'9';
+  digits = digit {digit};
+  id = 'A'-'Z' + 'a'-'z' + '_';
+  upperID = 'A'-'Z';
+  lowerID = 'a'-'z' + '_';
+  cr = chr(10);

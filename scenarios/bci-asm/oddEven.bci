@@ -1,0 +1,59 @@
+# let rec 
+#   isOdd n = 
+#     if (n == 0) False else isEven (n - 1); 
+#   isEven n = 
+#     if (n == 0) True else isOdd (n - 1) 
+# in 
+#   isOdd 2001
+
+  ENTER 2
+  PUSH_CLOSURE $$isOdd
+  STORE_VAR 0
+  PUSH_CLOSURE $$isEven
+  STORE_VAR 1
+  PUSH_VAR 0 0
+  PUSH_INT 2001
+  SWAP_CALL
+  RET
+
+
+:$$isOdd
+  ENTER 1
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 0
+  EQ
+  JMP_TRUE $$isOdd-then
+  PUSH_VAR 1 1
+  PUSH_VAR 0 0
+  PUSH_INT 1
+  SUB
+  SWAP_CALL
+  JMP $$isOdd-next
+
+:$$isOdd-then
+  PUSH_FALSE
+
+:$$isOdd-next
+  RET
+
+
+:$$isEven
+  ENTER 1
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 0
+  EQ
+  JMP_TRUE $$isEven-then
+  PUSH_VAR 1 0
+  PUSH_VAR 0 0
+  PUSH_INT 1
+  SUB
+  SWAP_CALL
+  JMP $$isEven-next
+
+:$$isEven-then
+  PUSH_TRUE
+
+:$$isEven-next
+  RET

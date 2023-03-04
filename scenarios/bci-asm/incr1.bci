@@ -1,0 +1,21 @@
+# let
+#   incr = \n -> n + 1
+# in
+#   incr 10
+
+:$$main
+  ENTER 1
+  PUSH_CLOSURE $$incr
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 10
+  SWAP_CALL
+  RET
+
+:$$incr
+  ENTER 1
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 1
+  ADD
+  RET

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+PROJECT_HOME=$(dirname "$0")/..
+
+build_bin() {
+    echo "---| assemble scenario tests"
+
+    BASE_DIR="../../scenarios/bci-asm"
+
+    for FILE in "$BASE_DIR"/*.bci; do
+        echo "- scenario test: $FILE"
+        ../bci-deno/bci asm "$FILE" || exit 1
+    done
+
+}
+
+scenario_tests() {
+    echo "---| scenario tests"
+
+    BASE_DIR="../../scenarios/bci-asm"
+
+    for FILE in "$BASE_DIR"/*.bci; do
+        echo "- scenario test: $FILE"
+        ../bci-deno/bci run "$BASE_DIR"/$(basename "$FILE" .bci).bin | tee t.txt || exit 1
+
+        if ! diff -q "$BASE_DIR"/$(basename "$FILE" .bci).out t.txt; then
+            echo "scenario test failed: $FILE"
+            diff "$BASE_DIR"/../scenarios/$(basename "$FILE" .bci).out t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
+    done
+}
+
+unit_tests() {
+    echo "---| unit tests"
+
+    BASE_DIR="../../scenarios/bci-opcode"
+
+    for FILE in "$BASE_DIR"/*.bci; do
+        echo "- unit test: $FILE"
+        ../bci-deno/bci asm "$BASE_DIR"/$(basename "$FILE" .bci).bci || exit 1
+        ../bci-deno/bci run "$BASE_DIR"/$(basename "$FILE" .bci).bin | tee t.txt || exit 1
+
+        if ! diff -q "$BASE_DIR"/$(basename "$FILE" .bci).out t.txt; then
+            echo "scenario test failed: $FILE"
+            diff "$BASE_DIR"/$(basename "$FILE" .bci).out t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
+    done
+}
+
+cd "$PROJECT_HOME" || exit 1
+
+case "$1" in
+"" | help)
+    echo "Usage: $0 [<command>]"
+    echo "Commands:"
+    echo "  help"
+    echo "    This help page"
+    echo "  bin"
+    echo "    Assemble the scenario bin files"
+    echo "  scenario"
+    echo "    Run the different scenario tests"
+    echo "  run"
+    echo "    Run all tasks"
+    echo "  unit"
+    echo "    Run the different unit tests"
+    ;;
+
+bin)
+    build_bin
+    ;;
+
+scenario)
+    scenario_tests
+    ;;
+
+run)
+    unit_tests
+    build_bin
+    scenario_tests
+    ;;
+
+unit)
+    unit_tests
+    ;;
+
+*)
+    echo "$0: $1: Unknown command"
+    exit 1
+    ;;
+esac

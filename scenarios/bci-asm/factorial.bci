@@ -1,0 +1,35 @@
+# let rec factorial n =
+#   if (n == 0) 1 else n * (factorial (n - 1))
+# in
+#   factorial 10 
+
+  ENTER 1
+  PUSH_CLOSURE $$factorial
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 10
+  SWAP_CALL
+  RET
+
+:$$factorial
+  ENTER 1
+  STORE_VAR 0
+  PUSH_VAR 0 0
+  PUSH_INT 0
+  EQ
+  JMP_TRUE $$if-then
+  
+  PUSH_VAR 0 0
+  PUSH_VAR 1 0
+  PUSH_VAR 0 0
+  PUSH_INT 1
+  SUB
+  SWAP_CALL
+  MUL
+  JMP $$if-next
+
+:$$if-then
+  PUSH_INT 1
+
+:$$if-next
+  RET 

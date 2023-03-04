@@ -1,0 +1,85 @@
+#!/bin/bash
+
+PROJECT_HOME=$(dirname "$0")/..
+cd "$PROJECT_HOME" || exit 1
+
+build_parser() {
+    (
+        echo "---| build parser"
+        mkdir -p ./parser || exit 1
+
+        deno run --allow-read --allow-write --allow-net --unsafely-ignore-certificate-errors \
+            "https://raw.githubusercontent.com/littlelanguages/parspiler-cli/main/mod.ts" deno \
+            --verbose \
+            --scanner=./parser/Scanner.ts \
+            --parser=./parser/Parser.ts \
+            ../tlca/Grammar.llgd || exit 1
+
+        echo "---| formatting built parser"
+        deno fmt ./parser/*.ts || exit 1
+    )
+}
+
+scenario_tests() {
+    echo "---| scenario tests"
+
+    for FILE in ../../scenarios/tlca/*.inp; do
+        echo "- scenario test: $FILE"
+        deno run --allow-read Repl.ts "$FILE" > t.txt || exit 1
+
+        if ! diff -q ../../scenarios/tlca/$(basename "$FILE" .inp).out t.txt; then
+            echo "scenario test failed: $FILE"
+            diff ../../scenarios/tlca/$(basename "$FILE" .inp).out t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
+    done
+}
+
+unit_tests() {
+    echo "---| unit tests"
+
+    deno test || exit 1
+}
+
+case "$1" in
+"" | help)
+    echo "Usage: $0 [<command>]"
+    echo "Commands:"
+    echo "  help"
+    echo "    This help page"
+    echo "  parser"
+    echo "    Builds the parser from specs"
+    echo "  run"
+    echo "    Run all tasks"
+    echo "  scenario"
+    echo "    Run all scenario tests"
+    echo "  unit"
+    echo "    Run all unit tests"
+    ;;
+
+run)
+    build_parser
+    unit_tests
+    scenario_tests
+    ;;
+
+parser)
+    build_parser
+    ;;
+
+scenario)
+    scenario_tests
+    ;;
+
+unit)
+    unit_tests
+    ;;
+
+*)
+    echo "$0: $1: Unknown command"
+    exit 1
+    ;;
+esac

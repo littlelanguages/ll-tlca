@@ -1,0 +1,20 @@
+PUSH_INT 10
+PUSH_DATA $$List 0 0
+PUSH_DATA $$List 1 2
+
+JMP_DATA 2 $$IsNil $$IsCons
+
+:$$IsNil
+PUSH_INT 0
+RET
+
+:$$IsCons
+PUSH_INT 1
+RET
+
+.data
+:$$List
+0x2 0x0 0x0 0x0
+List
+Nil
+Cons

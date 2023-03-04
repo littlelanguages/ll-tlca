@@ -1,0 +1,42 @@
+"-- string assignment" ;
+let x = "hello" ;
+let m = "\"hello\"" ;
+let y = "hello world" ;
+
+"-- string_length" ;
+string_length "" ;
+string_length "hello" ;
+string_length "\"hello\"" ;
+
+"-- string_concat" ;
+string_concat "" "" ;
+string_concat "" "hello" ;
+string_concat "hello" "" ;
+string_concat "hello" "world" ;
+
+"-- string_substring" ;
+string_substring "" 0 0 ;
+string_substring "" 0 1 ;
+string_substring "hello" 0 0 ;
+string_substring "hello" 0 1 ;
+string_substring "hello" 0 2 ;
+string_substring "hello" 0 3 ;
+string_substring "hello" 0 4 ;
+string_substring "hello" 0 5 ;
+string_substring "hello" 0 6 ;
+string_substring "hello" 2 1 ;
+string_substring "hello" 100 101 ;
+string_substring "hello" -10 -5 ;
+
+"-- string_equal" ;
+string_equal "" "" ;
+string_equal "" "hello" ;
+string_equal "hello" "" ;
+string_equal "hello" "Hello" ;
+string_equal "hello" "hello" ;
+
+"-- string_compare" ;
+string_compare "" "" ;
+string_compare "a" "b" ;
+string_compare "b" "a" ;
+string_compare "a" "a"

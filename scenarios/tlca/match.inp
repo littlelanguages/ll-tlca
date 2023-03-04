@@ -1,0 +1,7 @@
+match 1 with x -> x + x ;
+match True with True -> 1 | False -> 0 ;
+match "hello" with "world" -> 0 | "hello" -> 1 ;
+match () with () -> 1 ;
+match (1, (False, 99)) with (_, (False, x)) -> x | (x, (True, _)) -> x ;
+match (1, (True, 99)) with (_, (False, x)) -> x | (x, (True, _)) -> x ;
+match 1 with 0 -> 0 | _ -> 1

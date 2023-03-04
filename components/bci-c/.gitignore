@@ -1,0 +1,7 @@
+src/*.o
+src/bci
+
+test/*.o
+test/test-runner
+
+compile_commands.json
