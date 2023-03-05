@@ -112,7 +112,7 @@ jobs:
 
       - name: Formatting
         run: |
-          cd ./tlca-bci/deno
+          cd ./components/bci-deno
           deno fmt --check
 
       - name: Scenario tests
