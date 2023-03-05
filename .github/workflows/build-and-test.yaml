@@ -11,7 +11,7 @@ defaults:
     shell: bash
 
 jobs:
-  'tlca-deno':
+  'deno':
     runs-on: ubuntu-latest
 
     steps:
@@ -48,7 +48,7 @@ jobs:
           cd ./components/deno
           ./tasks/dev scenario
 
-  'tlca-kotlin':
+  'kotlin':
     runs-on: ubuntu-latest
 
     steps:
