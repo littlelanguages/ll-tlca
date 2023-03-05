@@ -145,6 +145,12 @@ jobs:
           cd ./components/bci-c
           ./tasks/dev run
 
+      - name: Show hardware info
+        run: |
+          cd ./components/bci-c
+          uname -a
+          uname -m
+
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
