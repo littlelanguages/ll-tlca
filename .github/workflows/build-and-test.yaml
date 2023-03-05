@@ -144,3 +144,10 @@ jobs:
         run: |
           cd ./components/bci-c
           ./tasks/dev run
+
+      - name: Upload artifact
+        users: actions/upload-artifact@v2
+        with:
+          name: bci-c-linux-x86_64
+          path: ./components/bci-c/src/bci
+          retention-days: 5
