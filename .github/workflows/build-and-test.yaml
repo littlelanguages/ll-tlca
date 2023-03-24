@@ -202,8 +202,8 @@ jobs:
         uses: actions/checkout@v2
 
       - name: 'Upload Artifact'
-          uses: actions/upload-artifact@v3
-          with:
-            name: tlca-compile.jar
-            path: components/kotlin/app/build/libs/app.jar 
-            retention-days: 5
+        uses: actions/upload-artifact@v3
+        with:
+          name: tlca-compile.jar
+          path: components/kotlin/app/build/libs/app.jar 
+          retention-days: 5
