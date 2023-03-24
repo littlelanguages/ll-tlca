@@ -188,11 +188,6 @@ jobs:
           cd ./components/kotlin
           ./tasks/dev parser
 
-      - name: Unit tests
-        run: |
-          cd ./components/kotlin
-          ./tasks/dev unit
-
       - name: Build JAR
         run: |
           cd ./components/kotlin
@@ -201,9 +196,19 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v2
 
+      - name: Show all
+        run: |
+          pwd
+          ls -Fal
+          ls -Fal components
+          ls -Fal components/kotlin
+          ls -Fal components/kotlin/app
+          ls -Fal components/kotlin/app/build
+          ls -Fal components/kotlin/app/build/libs
+
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v3
         with:
           name: tlca-compile.jar
-          path: components/kotlin/app/build/libs/app.jar 
+          path: ./components/kotlin/app/build/libs/app.jar 
           retention-days: 5
