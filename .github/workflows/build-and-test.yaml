@@ -199,12 +199,7 @@ jobs:
       - name: Show all
         run: |
           pwd
-          ls -Fal
-          ls -Fal components
-          ls -Fal components/kotlin
-          ls -Fal components/kotlin/app
-          ls -Fal components/kotlin/app/build
-          ls -Fal components/kotlin/app/build/libs
+          ls -FalR
 
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v3
