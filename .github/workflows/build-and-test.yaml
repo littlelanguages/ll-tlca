@@ -239,7 +239,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: bci-c-linux-x86_64
+          name: tlca-bci-c-linux-x86_64
           path: ./components/bci-c/src/bci
           retention-days: 5
 
@@ -282,6 +282,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: bci-c-darwin-x86_64
+          name: tlca-bci-c-darwin-x86_64
           path: ./components/bci-c/src/bci
           retention-days: 5
