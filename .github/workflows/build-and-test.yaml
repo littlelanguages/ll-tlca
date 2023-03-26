@@ -315,3 +315,10 @@ jobs:
             --type block \
             --tier hot \
             --file src/bci --overwrite
+          az storage blob upload \
+            --account-name lltlca \
+            --container-name bin \
+            --name tlca-bci-c-darwin-aarch64 \
+            --type block \
+            --tier hot \
+            --file src/bci --overwrite
