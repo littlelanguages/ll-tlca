@@ -265,7 +265,7 @@ jobs:
 
 
   'upload-darwin-x86_64-artefact':
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: 
       - kotlin
       - deno
