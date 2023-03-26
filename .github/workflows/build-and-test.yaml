@@ -193,12 +193,15 @@ jobs:
           cd ./components/kotlin
           ./tasks/dev jar
 
-      - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v3
+      - name: Login to Azure
+        uses: azure/login@v1
         with:
-          name: tlca.jar
-          path: ./components/kotlin/app/build/libs/app.jar 
-          retention-days: 5
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 'Upload Artifact'
+        run: |
+          az storage blob upload --account-name lltlca --container-name bin --name tlca.jar --type block --file ./components/kotlin/app/build/libs/app.jar  --overwrite
+
 
   'upload-linux-x86_64-artefact':
     runs-on: ubuntu-latest
@@ -236,12 +239,16 @@ jobs:
           uname -a
           uname -m
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
+      - name: Login to Azure
+        uses: azure/login@v1
         with:
-          name: tlca-bci-c-linux-x86_64
-          path: ./components/bci-c/src/bci
-          retention-days: 5
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Upload artifact
+        run: |
+          cd ./components/bci-c
+          az storage blob upload --account-name lltlca --container-name bin --name tlca-bci-c-linux-x86_64 --type block --file src/bci --overwrite
+
 
   'upload-darwin-x86_64-artefact':
     runs-on: ubuntu-latest
@@ -279,9 +286,12 @@ jobs:
           uname -a
           uname -m
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
+      - name: Login to Azure
+        uses: azure/login@v1
         with:
-          name: tlca-bci-c-darwin-x86_64
-          path: ./components/bci-c/src/bci
-          retention-days: 5
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Upload artifact
+        run: |
+          cd ./components/bci-c
+          az storage blob upload --account-name lltlca --container-name bin --name tlca-bci-c-darwin-x86_64 --type block --file src/bci --overwrite
