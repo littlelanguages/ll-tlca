@@ -200,7 +200,14 @@ jobs:
 
       - name: 'Upload Artifact'
         run: |
-          az storage blob upload --account-name lltlca --container-name bin --name tlca.jar --type block --file ./components/kotlin/app/build/libs/app.jar  --overwrite
+          az storage blob upload \
+            --account-name lltlca \
+            --container-name bin \
+            --name tlca.jar \
+            --type block \
+            --tier hot \
+            --file ./components/kotlin/app/build/libs/app.jar  \
+            --overwrite
 
 
   'upload-linux-x86_64-artefact':
@@ -247,7 +254,14 @@ jobs:
       - name: Upload artifact
         run: |
           cd ./components/bci-c
-          az storage blob upload --account-name lltlca --container-name bin --name tlca-bci-c-linux-x86_64 --type block --file src/bci --overwrite
+          az storage blob upload \
+            --account-name lltlca \
+            --container-name bin \
+            --name tlca-bci-c-linux-x86_64 \
+            --type block \
+            --tier hot \
+            --file src/bci \
+            --overwrite
 
 
   'upload-darwin-x86_64-artefact':
@@ -294,4 +308,10 @@ jobs:
       - name: Upload artifact
         run: |
           cd ./components/bci-c
-          az storage blob upload --account-name lltlca --container-name bin --name tlca-bci-c-darwin-x86_64 --type block --file src/bci --overwrite
+          az storage blob upload \
+            --account-name lltlca \
+            --container-name bin \
+            --name tlca-bci-c-darwin-x86_64 \
+            --type block \
+            --tier hot \
+            --file src/bci --overwrite
