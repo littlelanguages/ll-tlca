@@ -65,6 +65,12 @@ const execute = (line: string, env: Env): Env => {
 };
 
 if (Deno.args.length === 0) {
+  console.log(
+    "Welcome to the REPL of the Lambda Calculus with ADTs Interpreter!",
+  );
+  console.log('Type ".quit" to exit.');
+  console.log("Enter a multi-line expression with ;; as a terminator.");
+
   let env = defaultEnv;
 
   while (true) {
