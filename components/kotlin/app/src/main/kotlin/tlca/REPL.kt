@@ -9,7 +9,7 @@ fun main(args: Array<String>) {
         println("Welcome to the REPL of the Lambda Calculus with ADTs Interpreter!");
         println("Type \".quit\" to exit.");
         println("Enter a multi-line expression with ;; as a terminator.");
-        
+
         var env = defaultEnvironment
         while (true) {
             val input = readline().trim()
