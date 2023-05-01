@@ -44,15 +44,22 @@ const Value = struct {
 };
 
 const ValueValue = union(enum) {
-    n: i32,
+    a: Activation,
     b: bool,
     c: Closure,
-    a: Activation,
+    d: Data,
+    n: i32,
 };
 
 const Closure = struct {
     previousActivation: ?*Value,
     ip: u32,
+};
+
+const Data = struct {
+    meta: u32,
+    id: u32,
+    data: []*Value,
 };
 
 const Activation = struct {
