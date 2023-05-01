@@ -23,8 +23,7 @@ const Value = struct {
 
     pub fn activation_depth(self: *Value) !u32 {
         switch (self.v) {
-            .n => return 0,
-            .b => return 0,
+            .n, .b, .d => return 0,
             .c => return 1,
             .a => return 1 + if (self.v.a.parentActivation == null) 0 else try self.v.a.parentActivation.?.activation_depth(),
         }
@@ -33,6 +32,9 @@ const Value = struct {
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
         switch (self.v) {
             .n, .b, .c => {},
+            .d => {
+                allocator.free(self.v.d.data);
+            },
             .a => {
                 if (self.v.a.data != null) {
                     allocator.free(self.v.a.data.?);
@@ -80,9 +82,7 @@ const MemoryState = struct {
     memory_size: u32,
     memory_capacity: u32,
 
-    fn new_value(self: *MemoryState, vv: ValueValue) !*Value {
-        gc(self);
-
+    fn push_value(self: *MemoryState, vv: ValueValue) !*Value {
         const v = try self.allocator.create(Value);
         self.memory_size += 1;
 
@@ -94,23 +94,37 @@ const MemoryState = struct {
 
         try self.stack.append(v);
 
+        gc(self);
+
         return v;
     }
 
-    pub fn new_activation_value(self: *MemoryState, parentActivation: ?*Value, closure: ?*Value, nextIP: u32) !*Value {
-        return try self.new_value(ValueValue{ .a = Activation{ .parentActivation = parentActivation, .closure = closure, .nextIP = nextIP, .data = null } });
+    pub fn push_activation_value(self: *MemoryState, parentActivation: ?*Value, closure: ?*Value, nextIP: u32) !*Value {
+        return try self.push_value(ValueValue{ .a = Activation{ .parentActivation = parentActivation, .closure = closure, .nextIP = nextIP, .data = null } });
     }
 
-    pub fn new_bool_value(self: *MemoryState, b: bool) !*Value {
-        return try self.new_value(ValueValue{ .b = b });
+    pub fn push_bool_value(self: *MemoryState, b: bool) !*Value {
+        return try self.push_value(ValueValue{ .b = b });
     }
 
-    pub fn new_closure_value(self: *MemoryState, parentActivation: ?*Value, targetIP: u32) !*Value {
-        return try self.new_value(ValueValue{ .c = Closure{ .previousActivation = parentActivation, .ip = targetIP } });
+    pub fn push_closure_value(self: *MemoryState, parentActivation: ?*Value, targetIP: u32) !*Value {
+        return try self.push_value(ValueValue{ .c = Closure{ .previousActivation = parentActivation, .ip = targetIP } });
     }
 
-    pub fn new_int_value(self: *MemoryState, i: i32) !*Value {
-        return try self.new_value(ValueValue{ .n = i });
+    pub fn push_data_value(self: *MemoryState, meta: u32, id: u32, size: u32) !*Value {
+        const data = try self.allocator.alloc(*Value, size);
+
+        var i: u32 = 0;
+        while (i < size) {
+            data[size - i - 1] = self.pop();
+            i += 1;
+        }
+
+        return try self.push_value(ValueValue{ .d = Data{ .meta = meta, .id = id, .data = data } });
+    }
+
+    pub fn push_int_value(self: *MemoryState, i: i32) !*Value {
+        return try self.push_value(ValueValue{ .n = i });
     }
 
     pub fn pop(self: *MemoryState) *Value {
@@ -195,6 +209,11 @@ fn mark(state: *MemoryState, possible_value: ?*Value, colour: Colour) void {
         .n, .b => {},
         .c => {
             mark(state, v.v.c.previousActivation, colour);
+        },
+        .d => {
+            for (v.v.d.data) |data| {
+                mark(state, data, colour);
+            }
         },
         .a => {
             mark(state, v.v.a.parentActivation, colour);
@@ -282,15 +301,22 @@ fn process_instruction(state: *MemoryState) !bool {
     const instruction = state.read_u8();
 
     switch (@intToEnum(Instructions.InstructionOpCode, instruction)) {
+        Instructions.InstructionOpCode.PUSH_DATA => {
+            const meta = state.read_i32();
+            const id = state.read_i32();
+            const size = state.read_i32();
+
+            _ = try state.push_data_value(@intCast(u32, meta), @intCast(u32, id), @intCast(u32, size));
+        },
         Instructions.InstructionOpCode.PUSH_TRUE => {
-            _ = try state.new_bool_value(true);
+            _ = try state.push_bool_value(true);
         },
         Instructions.InstructionOpCode.PUSH_FALSE => {
-            _ = try state.new_bool_value(false);
+            _ = try state.push_bool_value(false);
         },
         Instructions.InstructionOpCode.PUSH_INT => {
             const value = state.read_i32();
-            _ = try state.new_int_value(value);
+            _ = try state.push_int_value(value);
         },
         Instructions.InstructionOpCode.PUSH_VAR => {
             var index = state.read_i32();
@@ -313,7 +339,7 @@ fn process_instruction(state: *MemoryState) !bool {
         },
         Instructions.InstructionOpCode.PUSH_CLOSURE => {
             var targetIP = state.read_i32();
-            _ = try state.new_closure_value(state.activation, @intCast(u32, targetIP));
+            _ = try state.push_closure_value(state.activation, @intCast(u32, targetIP));
         },
         Instructions.InstructionOpCode.ADD => {
             const b = state.pop();
@@ -322,7 +348,7 @@ fn process_instruction(state: *MemoryState) !bool {
                 std.log.err("Run: ADD: expected two integers on the stack, got {} and {}\n", .{ a, b });
                 unreachable;
             }
-            _ = try state.new_int_value(a.v.n + b.v.n);
+            _ = try state.push_int_value(a.v.n + b.v.n);
         },
         Instructions.InstructionOpCode.SUB => {
             const b = state.pop();
@@ -331,7 +357,7 @@ fn process_instruction(state: *MemoryState) !bool {
                 std.log.err("Run: SUB: expected two integers on the stack, got {} and {}\n", .{ a, b });
                 unreachable;
             }
-            _ = try state.new_int_value(a.v.n - b.v.n);
+            _ = try state.push_int_value(a.v.n - b.v.n);
         },
         Instructions.InstructionOpCode.MUL => {
             const b = state.pop();
@@ -340,7 +366,7 @@ fn process_instruction(state: *MemoryState) !bool {
                 std.log.err("Run: MUL: expected two integers on the stack, got {} and {}\n", .{ a, b });
                 unreachable;
             }
-            _ = try state.new_int_value(a.v.n * b.v.n);
+            _ = try state.push_int_value(a.v.n * b.v.n);
         },
         Instructions.InstructionOpCode.DIV => {
             const b = state.pop();
@@ -349,7 +375,7 @@ fn process_instruction(state: *MemoryState) !bool {
                 std.log.err("Run: DIV: expected two integers on the stack, got {} and {}\n", .{ a, b });
                 unreachable;
             }
-            _ = try state.new_int_value(@divTrunc(a.v.n, b.v.n));
+            _ = try state.push_int_value(@divTrunc(a.v.n, b.v.n));
         },
         Instructions.InstructionOpCode.EQ => {
             const b = state.pop();
@@ -358,7 +384,7 @@ fn process_instruction(state: *MemoryState) !bool {
                 std.log.err("Run: EQ: expected two integers on the stack, got {} and {}\n", .{ a, b });
                 unreachable;
             }
-            _ = try state.new_bool_value(a.v.n == b.v.n);
+            _ = try state.push_bool_value(a.v.n == b.v.n);
         },
         Instructions.InstructionOpCode.DUP => {
             try state.push(state.peek(0));
@@ -382,7 +408,7 @@ fn process_instruction(state: *MemoryState) !bool {
             }
         },
         Instructions.InstructionOpCode.SWAP_CALL => {
-            const new_activation = try state.new_activation_value(state.activation, state.peek(1), state.ip);
+            const new_activation = try state.push_activation_value(state.activation, state.peek(1), state.ip);
             state.ip = state.peek(2).v.c.ip;
             state.activation = new_activation;
 
@@ -494,7 +520,7 @@ test "op DISCARD" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.DISCARD) });
     defer harness.deinit();
 
-    _ = try harness.state.new_int_value(123);
+    _ = try harness.state.push_int_value(123);
 
     const sp = harness.state.stack.items.len;
     try expect(!try harness.process_next_instruction());
@@ -505,7 +531,7 @@ test "op DUP" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.DUP) });
     defer harness.deinit();
 
-    _ = try harness.state.new_int_value(123);
+    _ = try harness.state.push_int_value(123);
 
     const sp = harness.state.stack.items.len;
     try expect(!try harness.process_next_instruction());
@@ -515,4 +541,27 @@ test "op DUP" {
     const v2 = harness.state.pop();
 
     try expect(v1.v.n == v2.v.n);
+}
+
+test "op PUSH_DATA" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_DATA), 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+    _ = try harness.state.push_bool_value(false);
+
+    try expect(harness.state.stack.items.len == 3);
+
+    try expect(!try harness.process_next_instruction());
+    try expect(harness.state.stack.items.len == 1);
+
+    const v = harness.state.pop();
+
+    try expect(v.v.d.meta == 1);
+    try expect(v.v.d.id == 2);
+    try expect(v.v.d.data.len == 3);
+    try expect(v.v.d.data[0].v.n == 123);
+    try expect(v.v.d.data[1].v.b);
+    try expect(!v.v.d.data[2].v.b);
 }
