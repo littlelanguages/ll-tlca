@@ -396,6 +396,20 @@ fn process_instruction(state: *MemoryState) !bool {
             const targetIP = state.read_i32();
             state.ip = @intCast(u32, targetIP);
         },
+        Instructions.InstructionOpCode.JMP_DATA => {
+            const number_of_items = state.read_i32();
+            const v = state.pop();
+            if (v.v != ValueValue.d) {
+                std.log.err("Run: JMP_DATA: expected a data value on the stack, got {}\n", .{v});
+                unreachable;
+            }
+            if (v.v.d.id >= number_of_items) {
+                std.log.err("Run: JMP_DATA: a constructor id of {d} needs to be less than the {d}\n", .{ v.v.d.id, number_of_items });
+                unreachable;
+            }
+
+            state.ip = @intCast(u32, read_i32_from(state.memory, @intCast(u32, state.ip + 4 * v.v.d.id)));
+        },
         Instructions.InstructionOpCode.JMP_TRUE => {
             const targetIP = state.read_i32();
             const v = state.pop();
@@ -515,6 +529,7 @@ const TestHarness = struct {
 };
 
 const expect = std.testing.expect;
+const expectEqual = std.testing.expectEqual;
 
 test "op DISCARD" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.DISCARD) });
@@ -552,16 +567,34 @@ test "op PUSH_DATA" {
     _ = try harness.state.push_bool_value(false);
 
     try expect(harness.state.stack.items.len == 3);
-
     try expect(!try harness.process_next_instruction());
-    try expect(harness.state.stack.items.len == 1);
+    try expectEqual(harness.state.ip, 17);
+    try expectEqual(harness.state.stack.items.len, 1);
 
     const v = harness.state.pop();
 
-    try expect(v.v.d.meta == 1);
-    try expect(v.v.d.id == 2);
-    try expect(v.v.d.data.len == 3);
-    try expect(v.v.d.data[0].v.n == 123);
+    try expectEqual(v.v.d.meta, 1);
+    try expectEqual(v.v.d.id, 2);
+    try expectEqual(v.v.d.data.len, 3);
+    try expectEqual(v.v.d.data[0].v.n, 123);
     try expect(v.v.d.data[1].v.b);
     try expect(!v.v.d.data[2].v.b);
+}
+
+test "op JMP_DATA" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_DATA), 4, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0, 50, 0, 0, 0 });
+    defer harness.deinit();
+
+    try expectEqual(harness.state.stack.items.len, 0);
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+    _ = try harness.state.push_bool_value(false);
+    _ = try harness.state.push_data_value(1, 3, 3);
+
+    try expectEqual(harness.state.stack.items.len, 1);
+
+    try expect(!try harness.process_next_instruction());
+
+    try expectEqual(harness.state.ip, 50);
+    try expectEqual(harness.state.stack.items.len, 0);
 }
