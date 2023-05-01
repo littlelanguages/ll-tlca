@@ -1,0 +1,124 @@
+#!/bin/bash
+
+PROJECT_HOME=$(dirname "$0")/..
+DENO_BCI=../bci-deno/bci.ts
+
+ASM_TESTS_HOME=../../scenarios/bci-asm
+OPCODE_TESTS_HOME=../../scenarios/bci-opcode
+
+build_bci() {
+    echo "---| build bci"
+    zig build || exit 1
+}
+
+build_bin() {
+    echo "---| assemble scenario tests"
+
+    for FILE in "$ASM_TESTS_HOME"/*.bci; do
+        echo "- scenario test: $FILE"
+        deno run --allow-read --allow-write "$DENO_BCI" asm "$FILE" || exit 1
+    done
+}
+
+opcode_tests() {
+    echo "---| run opcode tests"
+
+    for FILE in "$OPCODE_TESTS_HOME"/*.bci; do
+        echo "- opcode test: $FILE"
+
+	OUTPUT_BIN_FILE="$OPCODE_TESTS_HOME"/$(basename "$FILE" .bci).bin
+	OUTPUT_OUT_FILE="$OPCODE_TESTS_HOME"/$(basename "$FILE" .bci).out
+
+        deno run --allow-read --allow-write "$DENO_BCI" asm "$FILE" || exit 1
+        zig-out/bin/bci-zig run "$OUTPUT_BIN_FILE" > t.txt || exit 1
+
+        if grep -q "Memory leak detected" t.txt; then
+            echo "scenario test failed: $FILE"
+            echo "Memory leak detected"
+            rm t.txt
+            exit 1
+        fi
+
+        grep -v "^gc" t.txt > t2.txt
+        if ! diff -q "$OUTPUT_OUT_FILE" t2.txt; then
+            echo "scenario test failed: $FILE"
+            diff "$OUTPUT_OUT_FILE" t2.txt
+            rm t.txt t2.txt
+            exit 1
+        fi
+
+
+        rm t.txt t2.txt
+    done
+}
+
+scenario_tests() {
+    echo "---| run scenario tests"
+
+    for FILE in "$ASM_TESTS_HOME"/*.bci; do
+        echo "- scenario test: $FILE"
+
+	OUTPUT_BIN_FILE="$ASM_TESTS_HOME"/$(basename "$FILE" .bci).bin
+	OUTPUT_OUT_FILE="$ASM_TESTS_HOME"/$(basename "$FILE" .bci).out
+
+        zig-out/bin/bci-zig run "$OUTPUT_BIN_FILE" > t.txt || exit 1
+
+        if ! diff -q "$OUTPUT_OUT_FILE" t.txt; then
+            echo "scenario test failed: $FILE"
+            diff "$OUTPUT_OUT_FILE" t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
+    done
+}
+
+cd "$PROJECT_HOME" || exit 1
+
+case "$1" in
+"" | help)
+    echo "Usage: $0 [<command>]"
+    echo "Commands:"
+    echo "  help"
+    echo "    This help page"
+    echo "  bci"
+    echo "    Build the bci binary"
+    echo "  bin"
+    echo "    Assemble the scenario bin files"
+    echo "  opcode"
+    echo "    Run the different opcode tests"
+    echo "  scenario"
+    echo "    Run the different scenario tests"
+    echo "  run"
+    echo "    Run all tasks"
+    ;;
+
+bci)
+    build_bci
+    ;;
+
+bin)
+    build_bin
+    ;;
+
+scenario)
+    scenario_tests
+    ;;
+
+opcode)
+    opcode_tests
+    ;;
+
+run)
+    build_bci
+    opcode_tests
+    build_bin
+    scenario_tests
+    ;;
+
+*)
+    echo "$0: $1: Unknown command"
+    exit 1
+    ;;
+esac
