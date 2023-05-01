@@ -410,6 +410,17 @@ fn process_instruction(state: *MemoryState) !bool {
 
             state.ip = @intCast(u32, read_i32_from(state.memory, @intCast(u32, state.ip + 4 * v.v.d.id)));
         },
+        Instructions.InstructionOpCode.JMP_FALSE => {
+            const targetIP = state.read_i32();
+            const v = state.pop();
+            if (v.v != ValueValue.b) {
+                std.log.err("Run: JMP_FALSE: expected a boolean on the stack, got {}\n", .{v});
+                unreachable;
+            }
+            if (!v.v.b) {
+                state.ip = @intCast(u32, targetIP);
+            }
+        },
         Instructions.InstructionOpCode.JMP_TRUE => {
             const targetIP = state.read_i32();
             const v = state.pop();
@@ -519,6 +530,11 @@ const TestHarness = struct {
         };
     }
 
+    pub fn reset(self: *TestHarness, buffer: []const u8) !void {
+        self.state.deinit();
+        self.state = try init_memory_state(self.allocator, buffer);
+    }
+
     pub fn process_next_instruction(self: *TestHarness) !bool {
         return try process_instruction(&self.state);
     }
@@ -539,7 +555,7 @@ test "op DISCARD" {
 
     const sp = harness.state.stack.items.len;
     try expect(!try harness.process_next_instruction());
-    try expect(harness.state.stack.items.len == sp - 1);
+    try expectEqual(harness.state.stack.items.len, sp - 1);
 }
 
 test "op DUP" {
@@ -550,12 +566,12 @@ test "op DUP" {
 
     const sp = harness.state.stack.items.len;
     try expect(!try harness.process_next_instruction());
-    try expect(harness.state.stack.items.len == sp + 1);
+    try expectEqual(harness.state.stack.items.len, sp + 1);
 
     const v1 = harness.state.pop();
     const v2 = harness.state.pop();
 
-    try expect(v1.v.n == v2.v.n);
+    try expectEqual(v1.v.n, v2.v.n);
 }
 
 test "op PUSH_DATA" {
@@ -585,7 +601,6 @@ test "op JMP_DATA" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_DATA), 4, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0, 50, 0, 0, 0 });
     defer harness.deinit();
 
-    try expectEqual(harness.state.stack.items.len, 0);
     _ = try harness.state.push_int_value(123);
     _ = try harness.state.push_bool_value(true);
     _ = try harness.state.push_bool_value(false);
@@ -596,5 +611,26 @@ test "op JMP_DATA" {
     try expect(!try harness.process_next_instruction());
 
     try expectEqual(harness.state.ip, 50);
+    try expectEqual(harness.state.stack.items.len, 0);
+}
+
+test "op JMP_FALSE" {
+    // JMP_FALSE where tos = false
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_FALSE), 100, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_bool_value(false);
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 100);
+    try expectEqual(harness.state.stack.items.len, 0);
+
+    // JMP_FALSE where tos = true
+    try harness.reset(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_FALSE), 100, 0, 0, 0 });
+
+    _ = try harness.state.push_bool_value(true);
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 9);
     try expectEqual(harness.state.stack.items.len, 0);
 }
