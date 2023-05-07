@@ -337,7 +337,7 @@ fn gc(state: *MemoryState) void {
 }
 
 pub fn read_i32_from(buffer: []const u8, ip: u32) i32 {
-    return buffer[ip] + @as(i32, 8) * buffer[ip + 1] + @as(i32, 65536) * buffer[ip + 2] + @as(i32, 16777216) * buffer[ip + 3];
+    return buffer[ip] + @as(i32, 256) * buffer[ip + 1] + @as(i32, 65536) * buffer[ip + 2] + @as(i32, 16777216) * buffer[ip + 3];
 }
 
 pub fn read_string_from(buffer: []const u8, ip: u32) []const u8 {
@@ -438,7 +438,8 @@ fn append_value(state: *MemoryState, buffer: *std.ArrayList(u8), ov: ?*Value, st
             try buffer.appendSlice("<builtin-closure>");
         },
         .c => {
-            if (style == StringStyle.Raw or style == StringStyle.Literal) {
+            // if (style == StringStyle.Raw or style == StringStyle.Literal) {
+            if (style == StringStyle.Raw) {
                 try std.fmt.format(buffer.writer(), "c{d}#{d}", .{ v.v.c.ip, try v.activation_depth() });
             } else {
                 try buffer.appendSlice("function");
