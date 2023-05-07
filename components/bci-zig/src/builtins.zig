@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Machine = @import("machine.zig");
 
-pub fn print(state: *Machine.MemoryState) error{OutOfMemory}!void {
+fn print(state: *Machine.MemoryState) error{OutOfMemory}!void {
     const v = state.pop();
     _ = state.pop();
 
@@ -13,7 +13,18 @@ pub fn print(state: *Machine.MemoryState) error{OutOfMemory}!void {
     stdout.writer().print("{s}", .{s}) catch {};
 }
 
-pub fn println(state: *Machine.MemoryState) error{OutOfMemory}!void {
+fn print_literal(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    const v = state.pop();
+    _ = state.pop();
+
+    const s: []u8 = try Machine.to_string(state, v, Machine.StringStyle.Literal);
+    defer state.allocator.free(s);
+
+    const stdout = state.out;
+    stdout.writer().print("{s}", .{s}) catch {};
+}
+
+fn println(state: *Machine.MemoryState) error{OutOfMemory}!void {
     _ = state.pop();
     _ = state.pop();
 
@@ -21,7 +32,7 @@ pub fn println(state: *Machine.MemoryState) error{OutOfMemory}!void {
     stdout.writer().print("\n", .{}) catch {};
 }
 
-pub fn string_length(state: *Machine.MemoryState) error{OutOfMemory}!void {
+fn string_length(state: *Machine.MemoryState) error{OutOfMemory}!void {
     const v = state.pop();
     _ = state.pop();
 
@@ -32,15 +43,55 @@ pub fn string_length(state: *Machine.MemoryState) error{OutOfMemory}!void {
     _ = try state.push_int_value(@intCast(i32, v.v.s.len));
 }
 
-pub fn find(name: []const u8) ?(*const fn (state: *Machine.MemoryState) error{OutOfMemory}!void) {
-    if (std.mem.eql(u8, name, "$$builtin-string-length")) {
-        return string_length;
+fn string_substring(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    _ = try state.push_builtin_closure_value(state.peek(1), state.peek(0), string_substring_2);
+    state.stack.items[state.stack.items.len - 3] = state.stack.items[state.stack.items.len - 1];
+    _ = state.pop();
+    _ = state.pop();
+}
+
+fn string_substring_2(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    _ = try state.push_builtin_closure_value(state.peek(1), state.peek(0), string_substring_3);
+    state.stack.items[state.stack.items.len - 3] = state.stack.items[state.stack.items.len - 1];
+    _ = state.pop();
+    _ = state.pop();
+}
+
+fn string_substring_3(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    const v1 = state.pop();
+    const v2 = state.pop();
+
+    var arg3 = v1.v.n;
+    var arg2 = v2.v.bc.argument.v.n;
+    const arg1 = v2.v.bc.previous.v.bc.argument.v.s;
+
+    if (arg2 < 0) {
+        arg2 = 0;
     }
+    if (arg3 < 0) {
+        arg3 = 0;
+    }
+
+    if (arg2 > arg1.len) {
+        _ = try state.push_string_value("");
+    } else if (arg3 <= arg2) {
+        _ = try state.push_string_value("");
+    } else {
+        _ = try state.push_string_value(arg1[@intCast(usize, arg2)..@intCast(usize, arg3)]);
+    }
+}
+
+pub fn find(name: []const u8) ?(*const fn (state: *Machine.MemoryState) error{OutOfMemory}!void) {
     if (std.mem.eql(u8, name, "$$builtin-println")) {
         return println;
-    }
-    if (std.mem.eql(u8, name, "$$builtin-print")) {
+    } else if (std.mem.eql(u8, name, "$$builtin-print")) {
         return print;
+    } else if (std.mem.eql(u8, name, "$$builtin-print-literal")) {
+        return print_literal;
+    } else if (std.mem.eql(u8, name, "$$builtin-string-length")) {
+        return string_length;
+    } else if (std.mem.eql(u8, name, "$$builtin-string-substring")) {
+        return string_substring;
     }
 
     return null;

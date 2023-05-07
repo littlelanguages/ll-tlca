@@ -219,6 +219,8 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
                 _ = state.pop();
             } else if (closure.v == Machine.ValueValue.bi) {
                 try closure.v.bi(state);
+            } else if (closure.v == Machine.ValueValue.bc) {
+                try closure.v.bc.fun(state);
             } else {
                 std.log.err("Run: SWAP_CALL: expected a closure on the stack, got {}\n", .{closure});
                 unreachable;

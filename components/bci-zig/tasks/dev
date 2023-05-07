@@ -5,18 +5,49 @@ DENO_BCI=../bci-deno/bci.ts
 
 ASM_TESTS_HOME=../../scenarios/bci-asm
 OPCODE_TESTS_HOME=../../scenarios/bci-opcode
+TLCA_TESTS_HOME=../../scenarios/tlca
 
 build_bci() {
     echo "---| build bci"
     zig build || exit 1
 }
 
-build_bin() {
+build_asm_tests() {
     echo "---| assemble scenario tests"
 
     for FILE in "$ASM_TESTS_HOME"/*.bci; do
         echo "- scenario test: $FILE"
         deno run --allow-read --allow-write "$DENO_BCI" asm "$FILE" || exit 1
+    done
+}
+
+build_tlca_tests() {
+    echo "---| assemble tlca tests"
+
+    ../kotlin/tasks/dev parser || exit 1
+    ../kotlin/tasks/dev jar || exit 1
+    ../kotlin/tasks/dev compiler_scenario || exit 1
+}
+
+asm_tests() {
+    echo "---| run asm tests"
+
+    for FILE in "$ASM_TESTS_HOME"/*.bci; do
+        echo "- asm test: $FILE"
+
+        OUTPUT_BIN_FILE="$ASM_TESTS_HOME"/$(basename "$FILE" .bci).bin
+        OUTPUT_OUT_FILE="$ASM_TESTS_HOME"/$(basename "$FILE" .bci).out
+
+        zig-out/bin/bci-zig run "$OUTPUT_BIN_FILE" > t.txt || exit 1
+
+        if ! diff -q "$OUTPUT_OUT_FILE" t.txt; then
+            echo "asm test failed: $FILE"
+            diff "$OUTPUT_OUT_FILE" t.txt
+            rm t.txt
+            exit 1
+        fi
+
+        rm t.txt
     done
 }
 
@@ -52,19 +83,19 @@ opcode_tests() {
     done
 }
 
-scenario_tests() {
-    echo "---| run scenario tests"
+tlca_tests() {
+    echo "---| run tlca tests"
 
-    for FILE in "$ASM_TESTS_HOME"/*.bci; do
-        echo "- scenario test: $FILE"
+    for FILE in "$TLCA_TESTS_HOME"/*.inp; do
+        echo "- tlca test: $FILE"
 
-	OUTPUT_BIN_FILE="$ASM_TESTS_HOME"/$(basename "$FILE" .bci).bin
-	OUTPUT_OUT_FILE="$ASM_TESTS_HOME"/$(basename "$FILE" .bci).out
+        OUTPUT_BIN_FILE="$TLCA_TESTS_HOME"/$(basename "$FILE" .inp).bin
+        OUTPUT_OUT_FILE="$TLCA_TESTS_HOME"/$(basename "$FILE" .inp).out
 
         zig-out/bin/bci-zig run "$OUTPUT_BIN_FILE" > t.txt || exit 1
 
         if ! diff -q "$OUTPUT_OUT_FILE" t.txt; then
-            echo "scenario test failed: $FILE"
+            echo "asm test failed: $FILE"
             diff "$OUTPUT_OUT_FILE" t.txt
             rm t.txt
             exit 1
@@ -82,39 +113,57 @@ case "$1" in
     echo "Commands:"
     echo "  help"
     echo "    This help page"
-    echo "  bci"
-    echo "    Build the bci binary"
-    echo "  bin"
-    echo "    Assemble the scenario bin files"
-    echo "  opcode"
-    echo "    Run the different opcode tests"
-    echo "  scenario"
+    echo "  asm-tests"
     echo "    Run the different scenario tests"
+    echo "  build-asm"
+    echo "    Build the asm tests"
+    echo "  build-tlca"
+    echo "    Build the tlca tests"
+    echo "  bci"
+    echo "    Build the bci - bytecode interpreter"
+    echo "  opcode-tests"
+    echo "    Run the different opcode tests"
+    echo "  tlca-tests"
+    echo "    Run the different tlca tests"
     echo "  run"
     echo "    Run all tasks"
+    ;;
+
+asm-tests)
+    asm_tests
     ;;
 
 bci)
     build_bci
     ;;
 
-bin)
-    build_bin
+build-asm)
+    build_asm_tests
     ;;
 
-scenario)
-    scenario_tests
+asm-tests)
+    asm_tests
     ;;
 
-opcode)
+build-tlca)
+    build_tlca_tests
+    ;;
+
+opcode-tests)
     opcode_tests
+    ;;
+
+tlca-tests)
+    tlca_tests
     ;;
 
 run)
     build_bci
     opcode_tests
-    build_bin
-    scenario_tests
+    build_asm_tests
+    asm_tests
+    build_tlca_tests
+    tlca_tests
     ;;
 
 *)

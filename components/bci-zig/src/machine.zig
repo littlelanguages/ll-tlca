@@ -115,6 +115,10 @@ pub const MemoryState = struct {
         return try self.push_value(ValueValue{ .bi = f });
     }
 
+    pub fn push_builtin_closure_value(self: *MemoryState, previous: *Value, argument: *Value, f: *const fn (*MemoryState) error{OutOfMemory}!void) error{OutOfMemory}!*Value {
+        return try self.push_value(ValueValue{ .bc = BuiltinClosure{ .previous = previous, .argument = argument, .fun = f } });
+    }
+
     pub fn push_bool_value(self: *MemoryState, b: bool) error{OutOfMemory}!*Value {
         return try self.push_value(ValueValue{ .b = b });
     }
