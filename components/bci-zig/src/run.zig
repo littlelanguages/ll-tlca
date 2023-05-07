@@ -61,8 +61,23 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
             _ = try state.push_bool_value(true);
         },
         Instructions.InstructionOpCode.PUSH_TUPLE => {
-            var size = state.read_i32();
+            const size = state.read_i32();
             _ = try state.push_tuple_value(@intCast(u32, size));
+        },
+        Instructions.InstructionOpCode.PUSH_TUPLE_ITEM => {
+            const item = state.read_i32();
+            const d = state.pop();
+
+            if (d.v != Machine.ValueValue.t) {
+                std.log.err("Run: PUSH_TUPLE_ITEM: expected a tuple value on the stack, got {}\n", .{d});
+                unreachable;
+            }
+            if (item < 0 or item >= d.v.t.len) {
+                std.log.err("Run: PUSH_TUPLE_ITEM: item {d} is out of bounds for tuple value with {d} items\n", .{ item, d.v.t.len });
+                unreachable;
+            }
+
+            _ = try state.push(d.v.t[@intCast(usize, item)]);
         },
         Instructions.InstructionOpCode.PUSH_UNIT => {
             _ = try state.push_unit_value();
@@ -399,6 +414,25 @@ test "op PUSH_TUPLE" {
     try expectEqual(v.v.t[0].v.n, 123);
     try expect(v.v.t[1].v.b);
     try expect(!v.v.t[2].v.b);
+}
+
+test "op PUSH_TUPLE_ITEM" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_TUPLE_ITEM), 1, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+    _ = try harness.state.push_bool_value(false);
+    _ = try harness.state.push_tuple_value(3);
+
+    try expect(harness.state.stack.items.len == 1);
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 9);
+    try expectEqual(harness.state.stack.items.len, 1);
+
+    const v = harness.state.pop();
+
+    try expect(v.v.b);
 }
 
 test "op JMP_DATA" {
