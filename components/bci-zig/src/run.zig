@@ -22,11 +22,11 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
             const builtin = Builtins.find(builtin_name);
 
             if (builtin == null) {
-                std.log.err("Run: PUSH_BUILTIN: builtin not found: {s}\n", .{builtin_name});
+                std.log.err("Run: PUSH_BUILTIN: builtin not found: [{s}]\n", .{builtin_name});
                 unreachable;
             }
 
-            try builtin.?(state);
+            _ = try state.push_builtin_value(builtin.?);
         },
         Instructions.InstructionOpCode.PUSH_DATA => {
             const meta = state.read_i32();
@@ -34,6 +34,21 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
             const size = state.read_i32();
 
             _ = try state.push_data_value(@intCast(u32, meta), @intCast(u32, id), @intCast(u32, size));
+        },
+        Instructions.InstructionOpCode.PUSH_DATA_ITEM => {
+            const offset = state.read_i32();
+            const d = state.pop();
+
+            if (d.v != Machine.ValueValue.d) {
+                std.log.err("Run: PUSH_DATA_ITEM: expected a data value on the stack, got {}\n", .{d});
+                unreachable;
+            }
+            if (offset < 0 or offset >= d.v.d.data.len) {
+                std.log.err("Run: PUSH_DATA_ITEM: offset {d} is out of bounds for data value with {d} items\n", .{ offset, d.v.d.data.len });
+                unreachable;
+            }
+
+            try state.push(d.v.d.data[@intCast(usize, offset)]);
         },
         Instructions.InstructionOpCode.PUSH_FALSE => {
             _ = try state.push_bool_value(false);
@@ -44,6 +59,9 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
         },
         Instructions.InstructionOpCode.PUSH_TRUE => {
             _ = try state.push_bool_value(true);
+        },
+        Instructions.InstructionOpCode.PUSH_UNIT => {
+            _ = try state.push_unit_value();
         },
         Instructions.InstructionOpCode.PUSH_VAR => {
             var index = state.read_i32();
@@ -67,6 +85,10 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
         Instructions.InstructionOpCode.PUSH_CLOSURE => {
             var targetIP = state.read_i32();
             _ = try state.push_closure_value(state.activation, @intCast(u32, targetIP));
+        },
+        Instructions.InstructionOpCode.PUSH_STRING => {
+            var s = state.read_string();
+            _ = try state.push_string_value(s);
         },
         Instructions.InstructionOpCode.ADD => {
             const b = state.pop();
@@ -160,13 +182,22 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
             }
         },
         Instructions.InstructionOpCode.SWAP_CALL => {
-            const new_activation = try state.push_activation_value(state.activation, state.peek(1), state.ip);
-            state.ip = state.peek(2).v.c.ip;
-            state.activation = new_activation;
+            const closure = state.peek(1);
 
-            state.stack.items[state.stack.items.len - 3] = state.stack.items[state.stack.items.len - 2];
-            _ = state.pop();
-            _ = state.pop();
+            if (closure.v == Machine.ValueValue.c) {
+                const new_activation = try state.push_activation_value(state.activation, state.peek(1), state.ip);
+                state.ip = state.peek(2).v.c.ip;
+                state.activation = new_activation;
+
+                state.stack.items[state.stack.items.len - 3] = state.stack.items[state.stack.items.len - 2];
+                _ = state.pop();
+                _ = state.pop();
+            } else if (closure.v == Machine.ValueValue.bi) {
+                try closure.v.bi(state);
+            } else {
+                std.log.err("Run: SWAP_CALL: expected a closure on the stack, got {}\n", .{closure});
+                unreachable;
+            }
         },
         Instructions.InstructionOpCode.ENTER => {
             const num_items = state.read_i32();
@@ -187,13 +218,14 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
         Instructions.InstructionOpCode.RET => {
             if (state.activation.v.a.parentActivation == null) {
                 const v = state.pop();
-                const stdout = std.io.getStdOut().writer();
-                switch (v.v) {
-                    Machine.ValueValue.n => try stdout.print("{d}: Int\n", .{v.v.n}),
-                    Machine.ValueValue.b => try stdout.print("{}: Bool\n", .{v.v.b}),
-                    Machine.ValueValue.c => try stdout.print("c{d}#{d}\n", .{ v.v.c.ip, try v.activation_depth() }),
-                    else => try stdout.print("{}\n", .{v}),
+
+                if (v.v != Machine.ValueValue.u) {
+                    const s: []u8 = try Machine.to_string(state, v, Machine.StringStyle.Typed);
+                    defer state.allocator.free(s);
+
+                    try state.out.writer().print("{s}\n", .{s});
                 }
+
                 return true;
             }
             state.ip = state.activation.v.a.nextIP;
@@ -222,11 +254,11 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
     return false;
 }
 
-pub fn execute(buffer: []const u8) !void {
+pub fn execute(buffer: []const u8, out: std.fs.File) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    var state = try Machine.init_memory_state(allocator, buffer);
+    var state = try Machine.init_memory_state(allocator, buffer, out);
 
     while (true) {
         if (try process_instruction(&state)) {
@@ -253,13 +285,13 @@ const TestHarness = struct {
         return TestHarness{
             .allocator = allocator,
             .buffer = buffer,
-            .state = try Machine.init_memory_state(allocator, buffer),
+            .state = try Machine.init_memory_state(allocator, buffer, std.io.getStdOut()),
         };
     }
 
     pub fn reset(self: *TestHarness, buffer: []const u8) !void {
         self.state.deinit();
-        self.state = try Machine.init_memory_state(self.allocator, buffer);
+        self.state = try Machine.init_memory_state(self.allocator, buffer, std.io.getStdOut());
     }
 
     pub fn process_next_instruction(self: *TestHarness) !bool {
@@ -273,6 +305,7 @@ const TestHarness = struct {
 
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
+const expectEqualSlices = std.testing.expectEqualSlices;
 
 test "op DISCARD" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.DISCARD) });
@@ -324,6 +357,25 @@ test "op PUSH_DATA" {
     try expect(!v.v.d.data[2].v.b);
 }
 
+test "op PUSH_DATA_ITEM" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_DATA_ITEM), 1, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+    _ = try harness.state.push_bool_value(false);
+    _ = try harness.state.push_data_value(1, 2, 3);
+
+    try expect(harness.state.stack.items.len == 1);
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 9);
+    try expectEqual(harness.state.stack.items.len, 1);
+
+    const v = harness.state.pop();
+
+    try expect(v.v.b);
+}
+
 test "op JMP_DATA" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_DATA), 4, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0, 50, 0, 0, 0 });
     defer harness.deinit();
@@ -362,15 +414,55 @@ test "op JMP_FALSE" {
     try expectEqual(harness.state.stack.items.len, 0);
 }
 
-test "op PUSH_BUILTIN $$builtin-string-length" {
-    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-string-length" ++ &[_]u8{ 0, 0, 0, 0 });
+test "op PUSH_BUILTIN $$builtin-println" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-println" ++ &[_]u8{0} ++ &[_]u8{@enumToInt(Instructions.InstructionOpCode.SWAP_CALL)});
     defer harness.deinit();
 
-    _ = try harness.state.push_string_value("hello");
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 23);
+    try expectEqual(harness.state.stack.items.len, 1);
+    _ = try harness.state.push_unit_value();
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 24);
+    try expectEqual(harness.state.stack.items.len, 0);
+}
+
+test "op PUSH_BUILTIN $$builtin-string-length" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-string-length" ++ &[_]u8{0} ++ &[_]u8{@enumToInt(Instructions.InstructionOpCode.SWAP_CALL)});
+    defer harness.deinit();
+
     try expect(!try harness.process_next_instruction());
     try expectEqual(harness.state.ip, 29);
+    try expectEqual(harness.state.stack.items.len, 1);
+    _ = try harness.state.push_string_value("hello");
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 30);
     try expectEqual(harness.state.stack.items.len, 1);
 
     const v = harness.state.pop();
     try expectEqual(v.v.n, 5);
+}
+
+test "op PUSH_STRING" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_STRING) } ++ "Hello world" ++ &[_]u8{0});
+    defer harness.deinit();
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 17);
+    try expectEqual(harness.state.stack.items.len, 1);
+    const v = harness.state.pop();
+    try expectEqualSlices(u8, v.v.s, "Hello world");
+}
+
+test "op PUSH_UNIT" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_UNIT) });
+    defer harness.deinit();
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 5);
+    try expectEqual(harness.state.stack.items.len, 1);
+    const v = harness.state.pop();
+    try expect(v.v == Machine.ValueValue.u);
 }

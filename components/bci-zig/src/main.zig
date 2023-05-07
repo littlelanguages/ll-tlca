@@ -17,7 +17,7 @@ pub fn main() !void {
         const buffer: []u8 = try loadBinary(allocator, args[2]);
         defer allocator.free(buffer);
 
-        try execute(buffer);
+        try execute(buffer, std.io.getStdOut());
     } else {
         std.debug.print("Usage: {s} dis <filename>\n", .{args[0]});
     }

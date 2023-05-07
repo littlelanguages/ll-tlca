@@ -13,7 +13,7 @@ pub const Value = struct {
 
     pub fn activation_depth(self: *Value) !u32 {
         switch (self.v) {
-            .n, .b, .bi, .bc, .d, .s => return 0,
+            .n, .b, .bi, .bc, .d, .s, .u => return 0,
             .c => return 1,
             .a => return 1 + if (self.v.a.parentActivation == null) 0 else try self.v.a.parentActivation.?.activation_depth(),
         }
@@ -21,7 +21,7 @@ pub const Value = struct {
 
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
         switch (self.v) {
-            .b, .bi, .bc, .c, .n => {},
+            .b, .bi, .bc, .c, .n, .u => {},
             .s => {
                 allocator.free(self.v.s);
             },
@@ -41,17 +41,13 @@ pub const Value = struct {
 pub const ValueValue = union(enum) {
     a: Activation,
     b: bool,
-    bi: Builtin,
+    bi: *const fn (*MemoryState) error{OutOfMemory}!void,
     bc: BuiltinClosure,
     c: Closure,
     d: Data,
     n: i32,
     s: []const u8,
-};
-
-const Builtin = struct {
-    name: *[]const u8,
-    fun: *const fn (*MemoryState) error{OutOfMemory}!void,
+    u: bool,
 };
 
 const BuiltinClosure = struct {
@@ -88,6 +84,7 @@ pub const MemoryState = struct {
     root: ?*Value,
     memory_size: u32,
     memory_capacity: u32,
+    out: std.fs.File,
 
     fn push_value(self: *MemoryState, vv: ValueValue) error{OutOfMemory}!*Value {
         const v = try self.allocator.create(Value);
@@ -108,6 +105,10 @@ pub const MemoryState = struct {
 
     pub fn push_activation_value(self: *MemoryState, parentActivation: ?*Value, closure: ?*Value, nextIP: u32) error{OutOfMemory}!*Value {
         return try self.push_value(ValueValue{ .a = Activation{ .parentActivation = parentActivation, .closure = closure, .nextIP = nextIP, .data = null } });
+    }
+
+    pub fn push_builtin_value(self: *MemoryState, f: *const fn (*MemoryState) error{OutOfMemory}!void) error{OutOfMemory}!*Value {
+        return try self.push_value(ValueValue{ .bi = f });
     }
 
     pub fn push_bool_value(self: *MemoryState, b: bool) error{OutOfMemory}!*Value {
@@ -138,6 +139,10 @@ pub const MemoryState = struct {
         const newS = try self.allocator.alloc(u8, s.len);
         std.mem.copy(u8, newS, s);
         return try self.push_value(ValueValue{ .s = newS });
+    }
+
+    pub fn push_unit_value(self: *MemoryState) error{OutOfMemory}!*Value {
+        return try self.push_value(ValueValue{ .u = true });
     }
 
     pub fn pop(self: *MemoryState) *Value {
@@ -231,7 +236,7 @@ fn mark(state: *MemoryState, possible_value: ?*Value, colour: Colour) void {
     v.colour = colour;
 
     switch (v.v) {
-        .b, .bi, .n, .s => {},
+        .b, .bi, .n, .s, .u => {},
         .bc => {
             mark(state, v.v.bc.previous, colour);
             mark(state, v.v.bc.argument, colour);
@@ -305,7 +310,16 @@ pub fn read_i32_from(buffer: []const u8, ip: u32) i32 {
     return buffer[ip] + @as(i32, 8) * buffer[ip + 1] + @as(i32, 65536) * buffer[ip + 2] + @as(i32, 16777216) * buffer[ip + 3];
 }
 
-pub fn init_memory_state(allocator: std.mem.Allocator, buffer: []const u8) !MemoryState {
+fn read_string_from(buffer: []const u8, ip: u32) []const u8 {
+    var offset = ip;
+    while (buffer[offset] != 0) {
+        offset += 1;
+    }
+
+    return buffer[ip..offset];
+}
+
+pub fn init_memory_state(allocator: std.mem.Allocator, buffer: []const u8, out: std.fs.File) !MemoryState {
     const default_colour = Colour.White;
 
     var activation = try allocator.create(Value);
@@ -323,5 +337,159 @@ pub fn init_memory_state(allocator: std.mem.Allocator, buffer: []const u8) !Memo
         .root = activation,
         .memory_size = 1, // initialised to 1 to accomodate the root activation record
         .memory_capacity = 32,
+        .out = out,
     };
+}
+
+pub const StringStyle = enum(u2) { Raw, Literal, Typed };
+
+pub fn to_string(state: *MemoryState, v: *Value, style: StringStyle) ![]u8 {
+    var buffer = std.ArrayList(u8).init(state.allocator);
+    defer buffer.deinit();
+
+    try append_value(state, &buffer, v, style);
+    if (style == StringStyle.Typed) {
+        try buffer.appendSlice(": ");
+        try append_type(state, &buffer, v);
+    }
+
+    return buffer.toOwnedSlice();
+}
+
+fn append_value(state: *MemoryState, buffer: *std.ArrayList(u8), ov: ?*Value, style: StringStyle) !void {
+    if (ov == null) {
+        try buffer.append('-');
+        return;
+    }
+
+    const v = ov.?;
+
+    switch (v.v) {
+        .a => {
+            try buffer.append('<');
+            try append_value(state, buffer, v.v.a.parentActivation, style);
+            try buffer.appendSlice(", ");
+            try append_value(state, buffer, v.v.a.closure, style);
+            try buffer.appendSlice(", ");
+            if (v.v.a.nextIP == 0) {
+                try buffer.append('-');
+            } else {
+                try std.fmt.format(buffer.writer(), "{d}", .{v.v.a.nextIP});
+            }
+            try buffer.appendSlice(", ");
+            if (v.v.a.data == null) {
+                try buffer.append('-');
+            } else {
+                try buffer.append('[');
+                var first = true;
+                for (v.v.a.data.?) |data| {
+                    if (first) {
+                        first = false;
+                    } else {
+                        try buffer.appendSlice(", ");
+                    }
+                    try append_value(state, buffer, data, style);
+                }
+                try buffer.append(']');
+            }
+            try buffer.append('>');
+        },
+        .b => {
+            if (v.v.b) {
+                try buffer.appendSlice("true");
+            } else {
+                try buffer.appendSlice("false");
+            }
+        },
+        .bi => {
+            try buffer.appendSlice("<builtin>");
+        },
+        .bc => {
+            try buffer.appendSlice("<builtin-closure>");
+        },
+        .c => {
+            if (style == StringStyle.Raw) {
+                try std.fmt.format(buffer.writer(), "c{d}#{d}", .{ v.v.c.ip, try v.activation_depth() });
+            } else {
+                try buffer.appendSlice("function");
+            }
+        },
+        .d => {
+            try buffer.appendSlice(constructor_name(state, v.v.d.meta, v.v.d.id));
+
+            for (v.v.d.data) |data| {
+                try buffer.appendSlice(" ");
+
+                if (data.v == ValueValue.d and data.v.d.data.len > 0) {
+                    try buffer.append('(');
+                    try append_value(state, buffer, data, style);
+                    try buffer.append(')');
+                } else {
+                    try append_value(state, buffer, data, style);
+                }
+            }
+        },
+        .n => {
+            try std.fmt.format(buffer.writer(), "{d}", .{v.v.n});
+        },
+        .s => {
+            if (style == StringStyle.Raw) {
+                try buffer.appendSlice(v.v.s);
+            } else {
+                try std.fmt.format(buffer.writer(), "\"{s}\"", .{v.v.s});
+            }
+        },
+        .u => {
+            try buffer.appendSlice("()");
+        },
+    }
+}
+
+fn append_type(state: *MemoryState, buffer: *std.ArrayList(u8), v: *Value) !void {
+    switch (v.v) {
+        .a => {
+            try buffer.appendSlice("Activation");
+        },
+        .b => {
+            try buffer.appendSlice("Bool");
+        },
+        .bi => {
+            try buffer.appendSlice("Builtin");
+        },
+        .bc => {
+            try buffer.appendSlice("BuiltinClosure");
+        },
+        .c => {
+            try buffer.appendSlice("Closure");
+        },
+        .d => {
+            try buffer.appendSlice(adt_name(state, v.v.d.meta));
+        },
+        .n => {
+            try buffer.appendSlice("Int");
+        },
+        .s => {
+            try buffer.appendSlice("String");
+        },
+        .u => {
+            try buffer.appendSlice("Unit");
+        },
+    }
+}
+
+fn adt_name(state: *MemoryState, meta: u32) []const u8 {
+    return read_string_from(state.memory, meta + 4);
+}
+
+fn constructor_name(state: *MemoryState, meta: u32, id: u32) []const u8 {
+    var offset: u32 = @intCast(u32, read_string_from(state.memory, meta + 4).len) + meta + 5;
+
+    var runner = id;
+
+    while (runner > 0) {
+        runner -= 1;
+        offset += @intCast(u32, read_string_from(state.memory, offset).len) + 1;
+    }
+
+    return read_string_from(state.memory, offset);
 }
