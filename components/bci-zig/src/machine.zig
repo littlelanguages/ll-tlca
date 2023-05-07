@@ -44,7 +44,7 @@ pub const Value = struct {
 pub const ValueValue = union(enum) {
     a: Activation,
     b: bool,
-    bi: *const fn (*MemoryState) error{OutOfMemory}!void,
+    bi: Builtin,
     bc: BuiltinClosure,
     c: Closure,
     d: Data,
@@ -52,6 +52,11 @@ pub const ValueValue = union(enum) {
     s: []const u8,
     t: []*Value,
     u: bool,
+};
+
+const Builtin = struct {
+    name: []const u8,
+    fun: *const fn (*MemoryState) error{OutOfMemory}!void,
 };
 
 const BuiltinClosure = struct {
@@ -111,8 +116,8 @@ pub const MemoryState = struct {
         return try self.push_value(ValueValue{ .a = Activation{ .parentActivation = parentActivation, .closure = closure, .nextIP = nextIP, .data = null } });
     }
 
-    pub fn push_builtin_value(self: *MemoryState, f: *const fn (*MemoryState) error{OutOfMemory}!void) error{OutOfMemory}!*Value {
-        return try self.push_value(ValueValue{ .bi = f });
+    pub fn push_builtin_value(self: *MemoryState, name: []const u8, f: *const fn (*MemoryState) error{OutOfMemory}!void) error{OutOfMemory}!*Value {
+        return try self.push_value(ValueValue{ .bi = Builtin{ .name = name, .fun = f } });
     }
 
     pub fn push_builtin_closure_value(self: *MemoryState, previous: *Value, argument: *Value, f: *const fn (*MemoryState) error{OutOfMemory}!void) error{OutOfMemory}!*Value {
@@ -335,7 +340,7 @@ pub fn read_i32_from(buffer: []const u8, ip: u32) i32 {
     return buffer[ip] + @as(i32, 8) * buffer[ip + 1] + @as(i32, 65536) * buffer[ip + 2] + @as(i32, 16777216) * buffer[ip + 3];
 }
 
-fn read_string_from(buffer: []const u8, ip: u32) []const u8 {
+pub fn read_string_from(buffer: []const u8, ip: u32) []const u8 {
     var offset = ip;
     while (buffer[offset] != 0) {
         offset += 1;
@@ -427,13 +432,13 @@ fn append_value(state: *MemoryState, buffer: *std.ArrayList(u8), ov: ?*Value, st
             }
         },
         .bi => {
-            try buffer.appendSlice("<builtin>");
+            try buffer.appendSlice(v.v.bi.name);
         },
         .bc => {
             try buffer.appendSlice("<builtin-closure>");
         },
         .c => {
-            if (style == StringStyle.Raw) {
+            if (style == StringStyle.Raw or style == StringStyle.Literal) {
                 try std.fmt.format(buffer.writer(), "c{d}#{d}", .{ v.v.c.ip, try v.activation_depth() });
             } else {
                 try buffer.appendSlice("function");

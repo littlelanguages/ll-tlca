@@ -13,6 +13,68 @@ const Machine = @import("machine.zig");
 //   invoked and to the activation record that describes the environment in which the closure
 //   can execute.
 
+fn logInstruction(state: *Machine.MemoryState) !void {
+    var ip = state.ip;
+    const instruction = state.memory[ip];
+
+    std.debug.print("{d}: {s}", .{ ip, Instructions.instructions[instruction].name });
+    ip += 1;
+    for (Instructions.instructions[instruction].parameters) |parameter| {
+        if (parameter == Instructions.OpParameter.OP_INT or parameter == Instructions.OpParameter.OP_LABEL) {
+            const value = Machine.read_i32_from(state.memory, ip);
+
+            std.debug.print(" {}", .{value});
+            ip += 4;
+        } else {
+            const value = Machine.read_string_from(state.memory, ip);
+
+            std.debug.print(" {s}", .{value});
+            ip += @intCast(u32, value.len) + 1;
+        }
+    }
+    std.debug.print(": [", .{});
+    var i = state.stack.items.len;
+    while (i > 0) {
+        if (i != state.stack.items.len) {
+            std.debug.print(", ", .{});
+        }
+        const str = try Machine.to_string(state, state.stack.items[i - 1], Machine.StringStyle.Literal);
+        defer state.allocator.free(str);
+        std.debug.print("{s}", .{str});
+        i -= 1;
+    }
+    std.debug.print("]", .{});
+
+    var a: ?*Machine.Value = state.activation;
+    while (a != null) {
+        if (a.?.v.a.data == null) {
+            std.debug.print(" -", .{});
+        } else {
+            const vs: []?*Machine.Value = a.?.v.a.data.?;
+
+            std.debug.print(" <", .{});
+            var first = true;
+            for (vs) |v| {
+                if (first) {
+                    first = false;
+                } else {
+                    std.debug.print(" ", .{});
+                }
+                if (v == null) {
+                    std.debug.print(".", .{});
+                } else {
+                    const str = try Machine.to_string(state, v.?, Machine.StringStyle.Literal);
+                    defer state.allocator.free(str);
+                    std.debug.print("{s}", .{str});
+                }
+            }
+            std.debug.print(">", .{});
+        }
+        a = a.?.v.a.parentActivation;
+    }
+    std.debug.print("\n", .{});
+}
+
 fn process_instruction(state: *Machine.MemoryState) !bool {
     const instruction = state.read_u8();
 
@@ -26,7 +88,7 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
                 unreachable;
             }
 
-            _ = try state.push_builtin_value(builtin.?);
+            _ = try state.push_builtin_value(builtin_name, builtin.?);
         },
         Instructions.InstructionOpCode.PUSH_DATA => {
             const meta = state.read_i32();
@@ -218,7 +280,7 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
                 _ = state.pop();
                 _ = state.pop();
             } else if (closure.v == Machine.ValueValue.bi) {
-                try closure.v.bi(state);
+                try closure.v.bi.fun(state);
             } else if (closure.v == Machine.ValueValue.bc) {
                 try closure.v.bc.fun(state);
             } else {
@@ -288,6 +350,8 @@ pub fn execute(buffer: []const u8, out: std.fs.File) !void {
     var state = try Machine.init_memory_state(allocator, buffer, out);
 
     while (true) {
+        try logInstruction(&state);
+
         if (try process_instruction(&state)) {
             state.deinit();
 
