@@ -60,6 +60,10 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
         Instructions.InstructionOpCode.PUSH_TRUE => {
             _ = try state.push_bool_value(true);
         },
+        Instructions.InstructionOpCode.PUSH_TUPLE => {
+            var size = state.read_i32();
+            _ = try state.push_tuple_value(@intCast(u32, size));
+        },
         Instructions.InstructionOpCode.PUSH_UNIT => {
             _ = try state.push_unit_value();
         },
@@ -374,6 +378,27 @@ test "op PUSH_DATA_ITEM" {
     const v = harness.state.pop();
 
     try expect(v.v.b);
+}
+
+test "op PUSH_TUPLE" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_TUPLE), 3, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+    _ = try harness.state.push_bool_value(false);
+
+    try expect(harness.state.stack.items.len == 3);
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 9);
+    try expectEqual(harness.state.stack.items.len, 1);
+
+    const v = harness.state.pop();
+
+    try expectEqual(v.v.t.len, 3);
+    try expectEqual(v.v.t[0].v.n, 123);
+    try expect(v.v.t[1].v.b);
+    try expect(!v.v.t[2].v.b);
 }
 
 test "op JMP_DATA" {

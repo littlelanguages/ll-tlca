@@ -13,7 +13,7 @@ pub const Value = struct {
 
     pub fn activation_depth(self: *Value) !u32 {
         switch (self.v) {
-            .n, .b, .bi, .bc, .d, .s, .u => return 0,
+            .n, .b, .bi, .bc, .d, .s, .t, .u => return 0,
             .c => return 1,
             .a => return 1 + if (self.v.a.parentActivation == null) 0 else try self.v.a.parentActivation.?.activation_depth(),
         }
@@ -24,6 +24,9 @@ pub const Value = struct {
             .b, .bi, .bc, .c, .n, .u => {},
             .s => {
                 allocator.free(self.v.s);
+            },
+            .t => {
+                allocator.free(self.v.t);
             },
             .d => {
                 allocator.free(self.v.d.data);
@@ -47,6 +50,7 @@ pub const ValueValue = union(enum) {
     d: Data,
     n: i32,
     s: []const u8,
+    t: []*Value,
     u: bool,
 };
 
@@ -139,6 +143,18 @@ pub const MemoryState = struct {
         const newS = try self.allocator.alloc(u8, s.len);
         std.mem.copy(u8, newS, s);
         return try self.push_value(ValueValue{ .s = newS });
+    }
+
+    pub fn push_tuple_value(self: *MemoryState, size: u32) error{OutOfMemory}!*Value {
+        const data = try self.allocator.alloc(*Value, size);
+
+        var i: u32 = 0;
+        while (i < size) {
+            data[size - i - 1] = self.pop();
+            i += 1;
+        }
+
+        return try self.push_value(ValueValue{ .t = data });
     }
 
     pub fn push_unit_value(self: *MemoryState) error{OutOfMemory}!*Value {
@@ -236,6 +252,15 @@ fn mark(state: *MemoryState, possible_value: ?*Value, colour: Colour) void {
     v.colour = colour;
 
     switch (v.v) {
+        .a => {
+            mark(state, v.v.a.parentActivation, colour);
+            mark(state, v.v.a.closure, colour);
+            if (v.v.a.data != null) {
+                for (v.v.a.data.?) |data| {
+                    mark(state, data, colour);
+                }
+            }
+        },
         .b, .bi, .n, .s, .u => {},
         .bc => {
             mark(state, v.v.bc.previous, colour);
@@ -249,13 +274,9 @@ fn mark(state: *MemoryState, possible_value: ?*Value, colour: Colour) void {
                 mark(state, data, colour);
             }
         },
-        .a => {
-            mark(state, v.v.a.parentActivation, colour);
-            mark(state, v.v.a.closure, colour);
-            if (v.v.a.data != null) {
-                for (v.v.a.data.?) |data| {
-                    mark(state, data, colour);
-                }
+        .t => {
+            for (v.v.t) |item| {
+                mark(state, item, colour);
             }
         },
     }
@@ -439,6 +460,19 @@ fn append_value(state: *MemoryState, buffer: *std.ArrayList(u8), ov: ?*Value, st
                 try std.fmt.format(buffer.writer(), "\"{s}\"", .{v.v.s});
             }
         },
+        .t => {
+            try buffer.append('(');
+            var first = true;
+            for (v.v.t) |item| {
+                if (first) {
+                    first = false;
+                } else {
+                    try buffer.appendSlice(", ");
+                }
+                try append_value(state, buffer, item, style);
+            }
+            try buffer.append(')');
+        },
         .u => {
             try buffer.appendSlice("()");
         },
@@ -470,6 +504,19 @@ fn append_type(state: *MemoryState, buffer: *std.ArrayList(u8), v: *Value) !void
         },
         .s => {
             try buffer.appendSlice("String");
+        },
+        .t => {
+            try buffer.append('(');
+            var first = true;
+            for (v.v.t) |item| {
+                if (first) {
+                    first = false;
+                } else {
+                    try buffer.appendSlice(" * ");
+                }
+                try append_type(state, buffer, item);
+            }
+            try buffer.append(')');
         },
         .u => {
             try buffer.appendSlice("Unit");
