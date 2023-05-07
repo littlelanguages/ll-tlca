@@ -6,8 +6,11 @@ pub fn print(state: *Machine.MemoryState) error{OutOfMemory}!void {
     const v = state.pop();
     _ = state.pop();
 
+    const s: []u8 = try Machine.to_string(state, v, Machine.StringStyle.Raw);
+    defer state.allocator.free(s);
+
     const stdout = state.out;
-    stdout.writer().print("{s}", .{v.v.s}) catch {};
+    stdout.writer().print("{s}", .{s}) catch {};
 }
 
 pub fn println(state: *Machine.MemoryState) error{OutOfMemory}!void {
