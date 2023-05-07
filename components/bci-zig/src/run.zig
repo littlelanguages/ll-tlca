@@ -200,6 +200,12 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
                 state.ip = @intCast(u32, targetIP);
             }
         },
+        Instructions.InstructionOpCode.SWAP => {
+            const a = state.pop();
+            const b = state.pop();
+            try state.push(a);
+            try state.push(b);
+        },
         Instructions.InstructionOpCode.SWAP_CALL => {
             const closure = state.peek(1);
 
@@ -264,10 +270,10 @@ fn process_instruction(state: *Machine.MemoryState) !bool {
             }
             state.activation.v.a.data.?[@intCast(u32, index)] = v;
         },
-        else => {
-            std.log.err("Unknown instruction: {s}\n", .{Instructions.instructions[instruction].name});
-            unreachable;
-        },
+        // else => {
+        //     std.log.err("Unknown instruction: {s}\n", .{Instructions.instructions[instruction].name});
+        //     unreachable;
+        // },
     }
 
     return false;
@@ -353,6 +359,75 @@ test "op DUP" {
     try expectEqual(v1.v.n, v2.v.n);
 }
 
+test "op JMP_DATA" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_DATA), 4, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0, 50, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+    _ = try harness.state.push_bool_value(false);
+    _ = try harness.state.push_data_value(1, 3, 3);
+
+    try expectEqual(harness.state.stack.items.len, 1);
+
+    try expect(!try harness.process_next_instruction());
+
+    try expectEqual(harness.state.ip, 50);
+    try expectEqual(harness.state.stack.items.len, 0);
+}
+
+test "op JMP_FALSE" {
+    // JMP_FALSE where tos = false
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_FALSE), 100, 0, 0, 0 });
+    defer harness.deinit();
+
+    _ = try harness.state.push_bool_value(false);
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 100);
+    try expectEqual(harness.state.stack.items.len, 0);
+
+    // JMP_FALSE where tos = true
+    try harness.reset(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_FALSE), 100, 0, 0, 0 });
+
+    _ = try harness.state.push_bool_value(true);
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 9);
+    try expectEqual(harness.state.stack.items.len, 0);
+}
+
+test "op PUSH_BUILTIN $$builtin-println" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-println" ++ &[_]u8{0} ++ &[_]u8{@enumToInt(Instructions.InstructionOpCode.SWAP_CALL)});
+    defer harness.deinit();
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 23);
+    try expectEqual(harness.state.stack.items.len, 1);
+    _ = try harness.state.push_unit_value();
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 24);
+    try expectEqual(harness.state.stack.items.len, 0);
+}
+
+test "op PUSH_BUILTIN $$builtin-string-length" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-string-length" ++ &[_]u8{0} ++ &[_]u8{@enumToInt(Instructions.InstructionOpCode.SWAP_CALL)});
+    defer harness.deinit();
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 29);
+    try expectEqual(harness.state.stack.items.len, 1);
+    _ = try harness.state.push_string_value("hello");
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 30);
+    try expectEqual(harness.state.stack.items.len, 1);
+
+    const v = harness.state.pop();
+    try expectEqual(v.v.n, 5);
+}
+
 test "op PUSH_DATA" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_DATA), 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0 });
     defer harness.deinit();
@@ -435,75 +510,6 @@ test "op PUSH_TUPLE_ITEM" {
     try expect(v.v.b);
 }
 
-test "op JMP_DATA" {
-    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_DATA), 4, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0, 50, 0, 0, 0 });
-    defer harness.deinit();
-
-    _ = try harness.state.push_int_value(123);
-    _ = try harness.state.push_bool_value(true);
-    _ = try harness.state.push_bool_value(false);
-    _ = try harness.state.push_data_value(1, 3, 3);
-
-    try expectEqual(harness.state.stack.items.len, 1);
-
-    try expect(!try harness.process_next_instruction());
-
-    try expectEqual(harness.state.ip, 50);
-    try expectEqual(harness.state.stack.items.len, 0);
-}
-
-test "op JMP_FALSE" {
-    // JMP_FALSE where tos = false
-    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_FALSE), 100, 0, 0, 0 });
-    defer harness.deinit();
-
-    _ = try harness.state.push_bool_value(false);
-
-    try expect(!try harness.process_next_instruction());
-    try expectEqual(harness.state.ip, 100);
-    try expectEqual(harness.state.stack.items.len, 0);
-
-    // JMP_FALSE where tos = true
-    try harness.reset(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.JMP_FALSE), 100, 0, 0, 0 });
-
-    _ = try harness.state.push_bool_value(true);
-
-    try expect(!try harness.process_next_instruction());
-    try expectEqual(harness.state.ip, 9);
-    try expectEqual(harness.state.stack.items.len, 0);
-}
-
-test "op PUSH_BUILTIN $$builtin-println" {
-    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-println" ++ &[_]u8{0} ++ &[_]u8{@enumToInt(Instructions.InstructionOpCode.SWAP_CALL)});
-    defer harness.deinit();
-
-    try expect(!try harness.process_next_instruction());
-    try expectEqual(harness.state.ip, 23);
-    try expectEqual(harness.state.stack.items.len, 1);
-    _ = try harness.state.push_unit_value();
-
-    try expect(!try harness.process_next_instruction());
-    try expectEqual(harness.state.ip, 24);
-    try expectEqual(harness.state.stack.items.len, 0);
-}
-
-test "op PUSH_BUILTIN $$builtin-string-length" {
-    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_BUILTIN) } ++ "$$builtin-string-length" ++ &[_]u8{0} ++ &[_]u8{@enumToInt(Instructions.InstructionOpCode.SWAP_CALL)});
-    defer harness.deinit();
-
-    try expect(!try harness.process_next_instruction());
-    try expectEqual(harness.state.ip, 29);
-    try expectEqual(harness.state.stack.items.len, 1);
-    _ = try harness.state.push_string_value("hello");
-
-    try expect(!try harness.process_next_instruction());
-    try expectEqual(harness.state.ip, 30);
-    try expectEqual(harness.state.stack.items.len, 1);
-
-    const v = harness.state.pop();
-    try expectEqual(v.v.n, 5);
-}
-
 test "op PUSH_STRING" {
     var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.PUSH_STRING) } ++ "Hello world" ++ &[_]u8{0});
     defer harness.deinit();
@@ -524,4 +530,22 @@ test "op PUSH_UNIT" {
     try expectEqual(harness.state.stack.items.len, 1);
     const v = harness.state.pop();
     try expect(v.v == Machine.ValueValue.u);
+}
+
+test "op SWAP" {
+    var harness = try TestHarness.init(&[_]u8{ 0, 0, 0, 0, @enumToInt(Instructions.InstructionOpCode.SWAP) });
+    defer harness.deinit();
+
+    _ = try harness.state.push_int_value(123);
+    _ = try harness.state.push_bool_value(true);
+
+    try expectEqual(harness.state.peek(1).v.n, 123);
+    try expectEqual(harness.state.peek(0).v.b, true);
+
+    try expect(!try harness.process_next_instruction());
+    try expectEqual(harness.state.ip, 5);
+    try expectEqual(harness.state.stack.items.len, 2);
+
+    try expectEqual(harness.state.peek(0).v.n, 123);
+    try expectEqual(harness.state.peek(1).v.b, true);
 }
