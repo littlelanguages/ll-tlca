@@ -467,7 +467,19 @@ fn append_value(state: *MemoryState, buffer: *std.ArrayList(u8), ov: ?*Value, st
             if (style == StringStyle.Raw) {
                 try buffer.appendSlice(v.v.s);
             } else {
-                try std.fmt.format(buffer.writer(), "\"{s}\"", .{v.v.s});
+                try buffer.append('"');
+                for (v.v.s) |c| {
+                    switch (c) {
+                        '"' => {
+                            try buffer.append('\\');
+                            try buffer.append('"');
+                        },
+                        else => {
+                            try buffer.append(c);
+                        },
+                    }
+                }
+                try buffer.append('"');
             }
         },
         .t => {
