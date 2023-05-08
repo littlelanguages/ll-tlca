@@ -337,7 +337,7 @@ fn gc(state: *MemoryState) void {
 }
 
 pub fn read_i32_from(buffer: []const u8, ip: u32) i32 {
-    return buffer[ip] + @as(i32, 256) * buffer[ip + 1] + @as(i32, 65536) * buffer[ip + 2] + @as(i32, 16777216) * buffer[ip + 3];
+    return @bitCast(i32, @intCast(u32, buffer[ip]) | @shlExact(@intCast(u32, buffer[ip + 1]), 8) | @shlExact(@intCast(u32, buffer[ip + 2]), 16) | @shlExact(@intCast(u32, buffer[ip + 3]), 24));
 }
 
 pub fn read_string_from(buffer: []const u8, ip: u32) []const u8 {
