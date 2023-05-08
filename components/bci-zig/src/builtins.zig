@@ -32,15 +32,26 @@ fn println(state: *Machine.MemoryState) error{OutOfMemory}!void {
     stdout.writer().print("\n", .{}) catch {};
 }
 
-fn string_length(state: *Machine.MemoryState) error{OutOfMemory}!void {
-    const v = state.pop();
+fn string_compare(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    _ = try state.push_builtin_closure_value(state.peek(1), state.peek(0), string_compare_2);
+    state.stack.items[state.stack.items.len - 3] = state.stack.items[state.stack.items.len - 1];
     _ = state.pop();
+    _ = state.pop();
+}
 
-    if (v.v != Machine.ValueValue.s) {
+fn string_compare_2(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    const v1 = state.pop();
+    const v2 = state.pop();
+
+    const i = std.mem.indexOfDiff(u8, v2.v.bc.argument.v.s, v1.v.s);
+
+    if (i == null) {
         _ = try state.push_int_value(0);
+    } else if (v2.v.bc.argument.v.s[i.?] < v1.v.s[i.?]) {
+        _ = try state.push_int_value(-1);
+    } else {
+        _ = try state.push_int_value(1);
     }
-
-    _ = try state.push_int_value(@intCast(i32, v.v.s.len));
 }
 
 fn string_concat(state: *Machine.MemoryState) error{OutOfMemory}!void {
@@ -75,6 +86,17 @@ fn string_equal_2(state: *Machine.MemoryState) error{OutOfMemory}!void {
     const v2 = state.pop();
 
     _ = try state.push_bool_value(std.mem.eql(u8, v1.v.s, v2.v.bc.argument.v.s));
+}
+
+fn string_length(state: *Machine.MemoryState) error{OutOfMemory}!void {
+    const v = state.pop();
+    _ = state.pop();
+
+    if (v.v != Machine.ValueValue.s) {
+        _ = try state.push_int_value(0);
+    }
+
+    _ = try state.push_int_value(@intCast(i32, v.v.s.len));
 }
 
 fn string_substring(state: *Machine.MemoryState) error{OutOfMemory}!void {
@@ -124,6 +146,8 @@ pub fn find(name: []const u8) ?(*const fn (state: *Machine.MemoryState) error{Ou
         return print;
     } else if (std.mem.eql(u8, name, "$$builtin-print-literal")) {
         return print_literal;
+    } else if (std.mem.eql(u8, name, "$$builtin-string-compare")) {
+        return string_compare;
     } else if (std.mem.eql(u8, name, "$$builtin-string-concat")) {
         return string_concat;
     } else if (std.mem.eql(u8, name, "$$builtin-string-equal")) {
