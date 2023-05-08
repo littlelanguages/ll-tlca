@@ -350,7 +350,7 @@ pub fn execute(buffer: []const u8, out: std.fs.File) !void {
     var state = try Machine.init_memory_state(allocator, buffer, out);
 
     while (true) {
-        try logInstruction(&state);
+        // try logInstruction(&state);
 
         if (try process_instruction(&state)) {
             state.deinit();
@@ -614,4 +614,10 @@ test "op SWAP" {
 
     try expectEqual(harness.state.peek(0).v.n, 123);
     try expectEqual(harness.state.peek(1).v.b, true);
+}
+
+test "add" {
+    const n = @addWithOverflow(10, 11, u32, u32);
+
+    try expect(!n.overflow);
 }
