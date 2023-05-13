@@ -19,7 +19,7 @@ pub fn main() !void {
 
         try execute(buffer, std.io.getStdOut());
     } else {
-        std.debug.print("Usage: {s} dis <filename>\n", .{args[0]});
+        std.debug.print("Usage: {s} [dis|run] <filename>\n", .{args[0]});
     }
 }
 
