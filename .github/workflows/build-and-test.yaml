@@ -204,7 +204,7 @@ jobs:
 
   'upload-bci-zig-linux-x86_64-artefact':
     runs-on: ubuntu-latest
-     needs: 
+    needs: 
       - kotlin
       - deno
       - bci-deno
