@@ -241,7 +241,7 @@ jobs:
             --tier hot \
             --file ./main --overwrite
 
-  'upload-bci-zig-darwin-******-artefact':
+  'upload-bci-zig-darwin-xxxxxx-artefact':
     runs-on: macos-latest
     needs: 
       - kotlin
